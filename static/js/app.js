@@ -11,9 +11,60 @@ document.addEventListener('DOMContentLoaded', () => {
     const stopRecordingBtn = document.getElementById('stopRecording');
     const echoAudio = document.getElementById('echoAudio');
     const recordingStatus = document.getElementById('recordingStatus');
+    const uploadStatus = document.getElementById('uploadStatus');
     
     let mediaRecorder;
     let audioChunks = [];
+    
+    // Function to update the upload status
+    function updateUploadStatus(message, isError = false) {
+        if (!uploadStatus) return;
+        
+        // Clear previous classes
+        uploadStatus.className = 'status-message';
+        
+        // Set the message text
+        uploadStatus.textContent = message;
+        
+        // Add appropriate class based on message type
+        if (message.includes('Uploading')) {
+            uploadStatus.classList.add('info');
+        } else if (message.includes('successful')) {
+            uploadStatus.classList.add('success');
+        } else if (isError || message.includes('failed') || message.includes('Error')) {
+            uploadStatus.classList.add('error');
+        }
+    }
+    
+    // Function to upload audio to the server
+    async function uploadAudio(blob) {
+        updateUploadStatus('Uploading audio...');
+        
+        try {
+            const formData = new FormData();
+            formData.append('file', blob, 'recording.wav');
+            
+            const response = await fetch('/upload-audio/', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            updateUploadStatus(
+                `Upload successful! File: ${result.filename}, ` +
+                `Type: ${result.content_type}, Size: ${(result.size / 1024).toFixed(2)} KB`
+            );
+            return result;
+        } catch (error) {
+            console.error('Upload error:', error);
+            updateUploadStatus(`Upload failed: ${error.message}`, true);
+            throw error;
+        }
+    }
     
     // TTS functionality
     if (ttsSubmitBtn) {
@@ -83,15 +134,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 };
                 
-                mediaRecorder.onstop = () => {
+                mediaRecorder.onstop = async () => {
                     const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
                     const audioUrl = URL.createObjectURL(audioBlob);
                     echoAudio.src = audioUrl;
-                    recordingStatus.textContent = 'Recording complete! Click play to hear your recording.';
+                    recordingStatus.textContent = 'Recording complete! Processing...';
                     recordingStatus.style.color = 'black';
                     
                     // Enable the play button
                     echoAudio.controls = true;
+                    
+                    try {
+                        // Upload the recorded audio to the server
+                        await uploadAudio(audioBlob);
+                        recordingStatus.textContent = 'Recording complete! Click play to hear your recording.';
+                    } catch (error) {
+                        console.error('Error processing recording:', error);
+                        recordingStatus.textContent = 'Error processing recording. See upload status for details.';
+                        recordingStatus.style.color = 'red';
+                    }
                     
                     // Stop all tracks in the stream
                     stream.getTracks().forEach(track => track.stop());

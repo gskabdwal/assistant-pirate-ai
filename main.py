@@ -1,12 +1,16 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import uvicorn
 import os
 import requests
+import shutil
+from pathlib import Path
+from typing import Dict, Any
 from pydantic import BaseModel
 from dotenv import load_dotenv
+import time
 
 # Load environment variables
 load_dotenv()
@@ -25,6 +29,11 @@ MURF_API_URL = "https://api.murf.ai/v1/speech/generate"
 class TTSRequest(BaseModel):
     text: str
     voice_id: str = "en-US-natalie"  # Default voice ID
+
+# Set up directories
+BASE_DIR = Path(__file__).resolve().parent
+UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
 
 # Mount static files directory
 static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -74,5 +83,37 @@ async def text_to_speech(tts_request: TTSRequest):
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Error calling Murf API: {str(e)}")
 
+@app.post("/upload-audio/")
+async def upload_audio(file: UploadFile = File(...)) -> Dict[str, Any]:
+    """Handle audio file uploads"""
+    try:
+        # Create a safe filename
+        file_extension = os.path.splitext(file.filename)[1]
+        safe_filename = f"audio_{int(time.time())}{file_extension}"
+        file_path = UPLOAD_DIR / safe_filename
+        
+        # Save the uploaded file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Get file info
+        file_size = os.path.getsize(file_path)
+        
+        return {
+            "filename": safe_filename,
+            "content_type": file.content_type,
+            "size": file_size,
+            "status": "success"
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error uploading file: {str(e)}"
+        )
+    finally:
+        await file.close()
+
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="localhost", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)

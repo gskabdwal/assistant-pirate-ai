@@ -281,6 +281,36 @@ header p {
     margin: 20px 0;
 }
 
+/* Status Messages */
+.status-message {
+    margin-top: 15px;
+    padding: 10px 15px;
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1.5;
+    background-color: #f8f9fa;
+    border-left: 4px solid #6c757d;
+    transition: all 0.3s ease;
+}
+
+.status-message.success {
+    background-color: #e8f5e9;
+    border-left-color: #4caf50;
+    color: #2e7d32;
+}
+
+.status-message.error {
+    background-color: #ffebee;
+    border-left-color: #f44336;
+    color: #c62828;
+}
+
+.status-message.info {
+    background-color: #e3f2fd;
+    border-left-color: #2196f3;
+    color: #1565c0;
+}
+
 #startRecording {
     background-color: #37C77F;
     color: white;
