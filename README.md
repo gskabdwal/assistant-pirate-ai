@@ -110,12 +110,29 @@ Response:
 
 ### Environment Setup
 
-Create a `.env` file in the project root with your Murf API key:
+Create a `.env` file in the project root with your API keys:
 ```
+# Required for TTS functionality
 MURF_API_KEY=your_murf_api_key_here
+
+# Required for speech-to-text functionality
+ASSEMBLYAI_API_KEY=your_assemblyai_api_key_here
 ```
 
-**Note:** Make sure to keep your API key secure and never commit it to version control.
+**Note:** Make sure to keep your API keys secure and never commit them to version control.
+- Get your Murf API key from [Murf.ai](https://www.murf.ai/)
+- Get your AssemblyAI API key from [AssemblyAI](https://www.assemblyai.com/)
+
+### Browser Compatibility
+
+The application requires a modern browser that supports the following APIs:
+- Web Speech API (for speech recognition)
+- MediaRecorder API (for Echo Bot)
+
+Recommended browsers:
+- Google Chrome
+- Microsoft Edge
+- Firefox
 - Safari (recent versions)
 
 ### Next Steps
