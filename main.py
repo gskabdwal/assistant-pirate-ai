@@ -11,16 +11,25 @@ from typing import Dict, Any
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import time
+import assemblyai as aai
 
 # Load environment variables
 load_dotenv()
 
 app = FastAPI(title="Voice Agent")
 
-# Get Murf API key from environment variables
+# Get API keys from environment variables
 MURF_API_KEY = os.getenv("MURF_API_KEY")
+ASSEMBLYAI_API_KEY = os.getenv("ASSEMBLYAI_API_KEY")
+
 if not MURF_API_KEY:
     print("Warning: MURF_API_KEY not found in environment variables. TTS functionality will not work.")
+
+if not ASSEMBLYAI_API_KEY:
+    print("Warning: ASSEMBLYAI_API_KEY not found in environment variables. Transcription will not work.")
+else:
+    # Configure AssemblyAI
+    aai.settings.api_key = ASSEMBLYAI_API_KEY
 
 # Murf API endpoint
 MURF_API_URL = "https://api.murf.ai/v1/speech/generate"
@@ -83,33 +92,63 @@ async def text_to_speech(tts_request: TTSRequest):
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Error calling Murf API: {str(e)}")
 
-@app.post("/upload-audio/")
-async def upload_audio(file: UploadFile = File(...)) -> Dict[str, Any]:
-    """Handle audio file uploads"""
+@app.post("/transcribe/file")
+async def transcribe_audio(file: UploadFile = File(...)):
+    """Transcribe audio file using AssemblyAI"""
+    if not ASSEMBLYAI_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="AssemblyAI API key not configured"
+        )
+    
     try:
-        # Create a safe filename
-        file_extension = os.path.splitext(file.filename)[1]
-        safe_filename = f"audio_{int(time.time())}{file_extension}"
-        file_path = UPLOAD_DIR / safe_filename
+        # Read the audio file content
+        audio_data = await file.read()
         
-        # Save the uploaded file
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Create a transcriber
+        transcriber = aai.Transcriber()
         
-        # Get file info
-        file_size = os.path.getsize(file_path)
+        # Transcribe the audio data
+        transcript = transcriber.transcribe(
+            data=audio_data,
+            config=aai.TranscriptionConfig(speaker_labels=True)
+        )
         
+        if transcript.error:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Transcription error: {transcript.error}"
+            )
+        
+        # Return the transcription text
         return {
-            "filename": safe_filename,
-            "content_type": file.content_type,
-            "size": file_size,
-            "status": "success"
+            "status": "success",
+            "transcript": transcript.text,
+            "speakers": transcript.utterances if hasattr(transcript, 'utterances') else None
         }
         
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error uploading file: {str(e)}"
+            detail=f"Error during transcription: {str(e)}"
+        )
+    finally:
+        await file.close()
+
+@app.post("/upload-audio/")
+async def upload_audio(file: UploadFile = File(...)) -> Dict[str, Any]:
+    """Handle audio file uploads (kept for backward compatibility)"""
+    try:
+        # Just read the file content without saving
+        content = await file.read()
+        return {
+            "message": "File processed successfully (not saved to disk)",
+            "file_size": len(content)
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing file: {str(e)}"
         )
     finally:
         await file.close()

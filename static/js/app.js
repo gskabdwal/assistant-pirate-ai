@@ -36,6 +36,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    // Function to transcribe audio using the server
+    async function transcribeAudio(blob) {
+        updateUploadStatus('Transcribing audio...');
+        
+        try {
+            const formData = new FormData();
+            formData.append('file', blob, 'recording.wav');
+            
+            const response = await fetch('/transcribe/file', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                updateUploadStatus('Transcription complete!');
+                return result;
+            } else {
+                throw new Error(result.error || 'Unknown error during transcription');
+            }
+        } catch (error) {
+            console.error('Error transcribing audio:', error);
+            updateUploadStatus(`Transcription failed: ${error.message}`, true);
+            throw error;
+        }
+    }
+    
     // Function to upload audio to the server
     async function uploadAudio(blob) {
         updateUploadStatus('Uploading audio...');
@@ -145,8 +178,34 @@ document.addEventListener('DOMContentLoaded', () => {
                     echoAudio.controls = true;
                     
                     try {
-                        // Upload the recorded audio to the server
-                        await uploadAudio(audioBlob);
+                        // Transcribe the audio
+                        const result = await transcribeAudio(audioBlob);
+                        
+                        // Display the transcription
+                        const transcriptionStatus = document.getElementById('transcriptionStatus');
+                        if (transcriptionStatus) {
+                            let transcriptionText = 'No transcription available';
+                            
+                            if (result.transcript) {
+                                if (result.speakers && result.speakers.length > 0) {
+                                    // Format with speaker labels if available
+                                    transcriptionText = result.speakers.map(utterance => 
+                                        `Speaker ${utterance.speaker}: ${utterance.text}`
+                                    ).join('\n\n');
+                                } else {
+                                    // Just show the plain transcript
+                                    transcriptionText = result.transcript;
+                                }
+                                
+                                // Update the status with the transcription
+                                transcriptionStatus.textContent = transcriptionText;
+                                transcriptionStatus.classList.remove('status-message');
+                                transcriptionStatus.classList.add('transcription-result');
+                            } else {
+                                transcriptionStatus.textContent = 'No transcription available';
+                                transcriptionStatus.className = 'status-message';
+                            }
+                        }
                         recordingStatus.textContent = 'Recording complete! Click play to hear your recording.';
                     } catch (error) {
                         console.error('Error processing recording:', error);
@@ -193,5 +252,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // Event listeners for the recording buttons
         startRecordingBtn.addEventListener('click', startRecording);
         stopRecordingBtn.addEventListener('click', stopRecording);
+        
+        // Add transcription status element
+        const transcriptionStatus = document.createElement('div');
+        transcriptionStatus.id = 'transcriptionStatus';
+        transcriptionStatus.className = 'status-message';
+        transcriptionStatus.textContent = 'Transcription will appear here';
+        
+        // Add it after the upload status in the audio player section
+        const audioPlayer = document.querySelector('.audio-player');
+        const uploadStatus = document.getElementById('uploadStatus');
+        audioPlayer.insertBefore(transcriptionStatus, uploadStatus.nextSibling);
     }
 });

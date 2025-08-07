@@ -35,11 +35,22 @@
 
 ### Features
 
+#### Day 6
+- Added audio transcription using AssemblyAI
+- Display transcription results in the UI
+- Improved error handling for transcription process
+- Added status messages for transcription feedback
+
+#### Day 5
+- Implemented audio file saving functionality
+- Added audio playback controls
+- Enhanced Echo Bot with file handling
+- Added upload status indicators
+
 #### Day 4
 - Voice recording and playback with Echo Bot
 - Real-time recording status updates
 - Browser-based audio recording using MediaRecorder API
-
 
 #### Day 3
 - Built UI for TTS endpoint
