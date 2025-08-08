@@ -35,6 +35,13 @@
 
 ### Features
 
+#### Day 7
+- Enhanced Echo Bot with Murf TTS integration
+- Improved UI with consistent audio player styling
+- Added real-time status updates for recording and processing
+- Fixed JavaScript errors and improved error handling
+- Streamlined status message display
+
 #### Day 6
 - Added audio transcription using AssemblyAI
 - Display transcription results in the UI

@@ -48,15 +48,21 @@
         </div>
         <div class="echo-bot-container">
             <h2>Echo Bot</h2>
+            <div id="echoBotStatus" class="status-message">Press "Start Recording" to begin</div>
             <div class="recording-controls">
                 <button id="startRecording" class="control-btn">Start Recording</button>
                 <button id="stopRecording" class="control-btn" disabled>Stop Recording</button>
             </div>
             <div class="audio-player">
-                <h3>Recording Playback</h3>
+                <h3>Your Recording</h3>
                 <audio id="echoAudio" controls></audio>
-                <div id="recordingStatus">Press "Start Recording" to begin</div>
-                <div id="transcriptionStatus" class="status-message">The recorded audio transcription will show here.</div>
+                <h3>Transcription</h3>
+                <div id="transcriptionBox" class="transcription-box">
+                    <div id="transcriptionText">Your transcribed text will appear here...</div>
+                </div>
+                <br>
+                <h3>Generated Audio</h3>
+                <audio id="echoTTSAudio" controls></audio>
             </div>
         </div>
     </div>

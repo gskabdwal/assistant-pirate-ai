@@ -281,6 +281,201 @@ header p {
     margin: 20px 0;
 }
 
+/* Process Status */
+.process-status {
+    margin: 25px 0;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #3A10E5;
+}
+
+.process-status h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #10162F;
+}
+
+.status-box {
+    padding: 12px 15px;
+    background-color: white;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+    color: #333;
+    font-size: 15px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+}
+
+/* Transcription Box */
+.transcription-box {
+    background-color: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 15px 0;
+    min-height: 100px;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #333;
+}
+
+#transcriptionText {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Audio Player Styling */
+/* Base audio element styles */
+audio {
+    width: 100%;
+    margin: 10px 0 15px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    padding: 10px;
+    border: 1px solid #e0e0e0;
+    height: 40px;
+}
+
+/* Style the audio control panel */
+audio::-webkit-media-controls-panel {
+    background-color: #F6F9FC;
+    border-radius: 4px;
+}
+
+/* Style the play/pause button */
+audio::-webkit-media-controls-play-button,
+audio::-webkit-media-controls-current-time-display,
+audio::-webkit-media-controls-time-remaining-display,
+audio::-webkit-media-controls-timeline,
+audio::-webkit-media-controls-mute-button,
+audio::-webkit-media-controls-volume-slider {
+    color: #3A10E5;
+}
+
+/* Hover effects */
+audio:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+audio:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(58, 16, 229, 0.2);
+}
+
+/* Status Messages */
+.status-message {
+    margin: 8px 0 15px;
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 14px;
+    background-color: #f8f9fa;
+    color: #555;
+}
+
+/* Audio Player Section */
+.audio-player {
+    margin: 20px 0;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+.audio-player h3 {
+    margin-top: 0;
+    color: #10162F;
+    transition: all 0.3s ease;
+}
+
+/* Status Messages */
+.status-message, .status-box {
+    max-width: 500px;
+    margin: 15px 0;
+    border-radius: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+audio:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px #4a90e2;
+}
+
+/* Echo Bot Container */
+.echo-bot-container {
+    margin-top: 30px;
+    padding: 25px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.echo-bot-container h2 {
+    margin-bottom: 20px;
+    color: #10162F;
+    font-size: 1.8em;
+}
+
+/* Transcription Display */
+#transcriptionStatus {
+    margin: 15px 0;
+    padding: 12px 15px;
+    border-radius: 6px;
+    background-color: #f8f9fa;
+    border-left: 4px solid #6c757d;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    transition: all 0.3s ease;
+}
+
+/* TTS Audio Player */
+#echoTTSAudio, #echoAudio {
+    width: 100%;
+    max-width: 700px;
+    margin: 15px 0;
+    border-radius: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    display: none; /* Hidden by default */
+}
+
+#echoTTSAudio:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px #4a90e2;
+}
+
+/* Recording Controls */
+.recording-controls {
+    display: flex;
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.control-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    background-color: #4a90e2;
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.control-btn:hover {
+    background-color: #3a7bc8;
+    transform: translateY(-1px);
+}
+
+.control-btn:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
 /* Transcription result styles */
 .transcription-result {
     margin: 15px 0;
@@ -393,10 +588,10 @@ header p {
     background-color: #F6F9FC;
 }
 
-#ttsAudio::-webkit-media-controls-play-button {
-    background-color: #3A10E5;
+/* #ttsAudio::-webkit-media-controls-play-button {
+    background-color: #7a5cf0;
     border-radius: 50%;
-}
+} */
 
 #ttsStatus {
     color: #6B7F99;
