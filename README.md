@@ -35,6 +35,12 @@
 
 ### Features
 
+#### Day 8
+- Integrated Google Gemini API for Large Language Model (LLM) capabilities
+- Added POST `/llm/query` endpoint for text-based AI responses
+- Enhanced server with Gemini 1.5 Flash model integration
+- Added proper error handling and API key validation for LLM functionality
+
 #### Day 7
 - Enhanced Echo Bot with Murf TTS integration
 - Improved UI with consistent audio player styling
@@ -115,6 +121,32 @@ Response:
 - `text`: The text to convert to speech (required)
 - `voice_id`: The voice ID to use (optional, defaults to "en-US-marcus")
 
+### Using the LLM Endpoint (Day 8)
+
+You can use the FastAPI Swagger UI to test the endpoint at http://localhost:8000/docs
+
+#### POST /llm/query
+
+Request body:
+```json
+{
+  "text": "What is artificial intelligence?"
+}
+```
+
+Response:
+```json
+{
+  "query": "What is artificial intelligence?",
+  "response": "Artificial intelligence (AI) is a branch of computer science that aims to create intelligent machines that can think and act like humans...",
+  "status": "success"
+}
+```
+
+#### Parameters
+
+- `text`: The text query to send to the LLM (required)
+
 ### Environment Setup
 
 Create a `.env` file in the project root with your API keys:
@@ -124,11 +156,15 @@ MURF_API_KEY=your_murf_api_key_here
 
 # Required for speech-to-text functionality
 ASSEMBLYAI_API_KEY=your_assemblyai_api_key_here
+
+# Required for LLM functionality (Day 8)
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 **Note:** Make sure to keep your API keys secure and never commit them to version control.
 - Get your Murf API key from [Murf.ai](https://www.murf.ai/)
 - Get your AssemblyAI API key from [AssemblyAI](https://www.assemblyai.com/)
+- Get your Gemini API key from [Google AI Studio](https://ai.google.dev/gemini-api/docs/quickstart)
 
 ### Browser Compatibility
 

@@ -14,6 +14,7 @@ import time
 import assemblyai as aai
 import tempfile
 import uuid
+import google.generativeai as genai
 
 # Load environment variables
 load_dotenv()
@@ -23,6 +24,7 @@ app = FastAPI(title="Voice Agent")
 # Get API keys from environment variables
 MURF_API_KEY = os.getenv("MURF_API_KEY")
 ASSEMBLYAI_API_KEY = os.getenv("ASSEMBLYAI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not MURF_API_KEY:
     print("Warning: MURF_API_KEY not found in environment variables. TTS functionality will not work.")
@@ -32,6 +34,12 @@ if not ASSEMBLYAI_API_KEY:
 else:
     # Configure AssemblyAI
     aai.settings.api_key = ASSEMBLYAI_API_KEY
+
+if not GEMINI_API_KEY:
+    print("Warning: GEMINI_API_KEY not found in environment variables. LLM functionality will not work.")
+else:
+    # Configure Gemini AI
+    genai.configure(api_key=GEMINI_API_KEY)
 
 # API endpoints
 MURF_API_URL = "https://api.murf.ai/v1/speech/generate"
@@ -45,6 +53,9 @@ class TTSRequest(BaseModel):
 class EchoRequest(BaseModel):
     audio: UploadFile
     voice_id: Optional[str] = "en-US-natalie"  # Default voice ID
+
+class LLMRequest(BaseModel):
+    text: str
 
 # Set up directories
 BASE_DIR = Path(__file__).resolve().parent
@@ -306,6 +317,38 @@ async def echo_tts(
     except Exception as e:
         print(f"Error in echo_tts: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+
+@app.post("/llm/query")
+async def llm_query(request: LLMRequest):
+    """
+    Generate a response using Google's Gemini API for the given text input.
+    """
+    if not GEMINI_API_KEY:
+        raise HTTPException(
+            status_code=500, 
+            detail="Gemini API key not configured. Please set GEMINI_API_KEY in your environment variables."
+        )
+    
+    try:
+        # Initialize the Gemini model (using the latest available model)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Generate response
+        response = model.generate_content(request.text)
+        
+        # Check if response was generated successfully
+        if not response.text:
+            raise HTTPException(status_code=500, detail="Failed to generate response from Gemini API")
+        
+        return {
+            "query": request.text,
+            "response": response.text,
+            "status": "success"
+        }
+        
+    except Exception as e:
+        print(f"Error in llm_query: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"An error occurred while processing your request: {str(e)}")
 
 # Make sure uploads directory is served
 @app.get("/uploads/{filename}")
