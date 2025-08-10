@@ -167,6 +167,7 @@ header p {
 .transcript-container,
 .response-container,
 .tts-container,
+.llm-voice-container,
 .echo-bot-container {
     background-color: white;
     border-radius: 2px;
@@ -179,6 +180,7 @@ header p {
 .transcript-container h2,
 .response-container h2,
 .tts-container h2,
+.llm-voice-container h2,
 .echo-bot-container h2 {
     position: relative;
     color: #10162F;
@@ -188,6 +190,7 @@ header p {
 }
 
 .tts-container h2:after,
+.llm-voice-container h2:after,
 .echo-bot-container h2:after {
     content: '';
     position: absolute;
@@ -247,7 +250,8 @@ header p {
     letter-spacing: 0.5px;
 }
 
-#voiceSelect {
+#voiceSelect,
+#llmVoiceSelect {
     padding: 12px 16px;
     border-radius: 2px;
     border: 2px solid #DFE1E5;
@@ -260,7 +264,8 @@ header p {
     min-width: 200px;
 }
 
-#voiceSelect:focus {
+#voiceSelect:focus,
+#llmVoiceSelect:focus {
     outline: none;
     border-color: #3A10E5;
     box-shadow: 0 0 0 1px rgba(58, 16, 229, 0.2);
@@ -548,25 +553,25 @@ audio:focus {
     color: #1565c0;
 }
 
-#startRecording {
+#startRecording, #startLLMRecording {
     background-color: #37C77F;
     color: white;
 }
 
-#startRecording:hover {
+#startRecording:hover, #startLLMRecording:hover {
     background-color: #2BA572;
 }
 
-#stopRecording {
+#stopRecording, #stopLLMRecording {
     background-color: #FF5C5C;
     color: white;
 }
 
-#stopRecording:hover {
+#stopRecording:hover, #stopLLMRecording:hover {
     background-color: #E04747;
 }
 
-#stopRecording:disabled {
+#stopRecording:disabled, #stopLLMRecording:disabled {
     background-color: #95a5a6;
     cursor: not-allowed;
 }

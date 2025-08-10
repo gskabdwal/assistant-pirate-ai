@@ -35,9 +35,19 @@
 
 ### Features
 
+#### Day 9 - The Full Non-Streaming Pipeline ✨
+- **Complete AI Voice Agent**: Full audio-to-audio conversation pipeline
+- **Updated `/llm/query` endpoint**: Now accepts audio input instead of text
+- **Full Pipeline Flow**: Audio → AssemblyAI Transcription → Gemini LLM → Murf TTS → Audio Response
+- **Character Limit Handling**: Automatic truncation for Murf's 3000 character limit
+- **Enhanced UI**: New "AI Voice Agent" section with consistent styling
+- **Smart Button States**: Recording buttons disabled during processing to prevent multiple submissions
+- **Voice Selection**: Choose from multiple AI voices for responses
+- **Auto-playback**: AI response audio plays automatically when ready
+
 #### Day 8
 - Integrated Google Gemini API for Large Language Model (LLM) capabilities
-- Added POST `/llm/query` endpoint for text-based AI responses
+- Added POST `/llm/query` endpoint for text-based AI responses (now updated for audio input)
 - Enhanced server with Gemini 1.5 Flash model integration
 - Added proper error handling and API key validation for LLM functionality
 
@@ -121,23 +131,37 @@ Response:
 - `text`: The text to convert to speech (required)
 - `voice_id`: The voice ID to use (optional, defaults to "en-US-marcus")
 
-### Using the LLM Endpoint (Day 8)
+### Using the AI Voice Agent Endpoint (Day 9)
 
-You can use the FastAPI Swagger UI to test the endpoint at http://localhost:8000/docs
+The `/llm/query` endpoint now accepts audio input for the full non-streaming pipeline.
 
 #### POST /llm/query
 
-Request body:
+**Request**: FormData with audio file
+- `file`: Audio file (WAV, MP3, etc.)
+- `voice_id`: Voice ID for AI response (optional, defaults to "en-US-natalie")
+
+**Response**:
 ```json
 {
-  "text": "What is artificial intelligence?"
+  "transcription": "What is artificial intelligence?",
+  "llm_response": "Artificial intelligence (AI) is...",
+  "audio_url": "/uploads/llm_response_uuid.mp3",
+  "status": "success"
 }
 ```
 
-Response:
-```json
-{
-  "query": "What is artificial intelligence?",
+**Pipeline Flow**:
+1. **Audio Input** → AssemblyAI Transcription
+2. **Transcription** → Gemini LLM Processing  
+3. **LLM Response** → Murf TTS Generation
+4. **Audio Response** → Client Playback
+
+### Using the Legacy LLM Text Endpoint (Day 8)
+
+For text-only LLM queries, you can still use the original format via the web interface.
+
+**Original Query Format**:
   "response": "Artificial intelligence (AI) is a branch of computer science that aims to create intelligent machines that can think and act like humans...",
   "status": "success"
 }
@@ -165,6 +189,20 @@ GEMINI_API_KEY=your_gemini_api_key_here
 - Get your Murf API key from [Murf.ai](https://www.murf.ai/)
 - Get your AssemblyAI API key from [AssemblyAI](https://www.assemblyai.com/)
 - Get your Gemini API key from [Google AI Studio](https://ai.google.dev/gemini-api/docs/quickstart)
+
+### How to Use the AI Voice Agent (Day 9)
+
+1. **Navigate to the AI Voice Agent section** on the main page
+2. **Select your preferred AI voice** from the dropdown (Rohan, Alia, Priya, or Natalie)
+3. **Click "Start Recording"** and ask your question
+4. **Click "Stop Recording"** when finished (buttons will be disabled during processing)
+5. **Wait for the AI response** - you'll see:
+   - Your transcribed question
+   - The AI's text response
+   - The AI's voice response (plays automatically)
+
+**Processing Flow**:
+- 🎤 **Record** → 📝 **Transcribe** → 🤖 **AI Think** → 🔊 **AI Speak**
 
 ### Browser Compatibility
 

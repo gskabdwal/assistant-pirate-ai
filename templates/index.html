@@ -46,6 +46,38 @@
                 <div id="ttsStatus"></div>
             </div>
         </div>
+        <div class="llm-voice-container">
+            <h2>AI Voice Agent</h2>
+            <div id="llmStatus" class="status-message">Press "Start Recording" to ask the AI a question</div>
+            <div class="recording-controls">
+                <button id="startLLMRecording" class="control-btn">Start Recording</button>
+                <button id="stopLLMRecording" class="control-btn" disabled>Stop Recording</button>
+            </div>
+            <div class="voice-selector">
+                <label for="llmVoiceSelect">AI Voice:</label>
+                <select id="llmVoiceSelect">
+                    <option value="en-IN-rohan">Rohan (English - India)</option>
+                    <option value="en-IN-alia">Alia (English - India)</option>
+                    <option value="en-IN-priya">Priya (English - India)</option>
+                    <option value="en-US-natalie">Natalie (US English)</option>
+                </select>
+            </div>
+            <div class="audio-player">
+                <h3>Your Question</h3>
+                <audio id="llmQuestionAudio" controls></audio>
+                <h3>Transcription</h3>
+                <div id="llmTranscriptionBox" class="transcription-box">
+                    <div id="llmTranscriptionText">Your question will appear here...</div>
+                </div>
+                <h3>AI Response</h3>
+                <div id="llmResponseBox" class="transcription-box">
+                    <div id="llmResponseText">AI response will appear here...</div>
+                </div>
+                <h3>AI Voice Response</h3>
+                <audio id="llmResponseAudio" controls></audio>
+            </div>
+        </div>
+        
         <div class="echo-bot-container">
             <h2>Echo Bot</h2>
             <div id="echoBotStatus" class="status-message">Press "Start Recording" to begin</div>

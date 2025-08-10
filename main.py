@@ -48,14 +48,17 @@ MURF_VOICES_URL = "https://api.murf.ai/v1/studio/voice-ai/voice-list"
 # Request model for TTS endpoint
 class TTSRequest(BaseModel):
     text: str
-    voice_id: str = "en-US-natalie"  # Default voice ID
 
 class EchoRequest(BaseModel):
     audio: UploadFile
-    voice_id: Optional[str] = "en-US-natalie"  # Default voice ID
+    voice_id: Optional[str] = "en-US-natalie"
 
 class LLMRequest(BaseModel):
     text: str
+
+class LLMAudioRequest(BaseModel):
+    audio: UploadFile
+    voice_id: Optional[str] = "en-US-natalie"
 
 # Set up directories
 BASE_DIR = Path(__file__).resolve().parent
@@ -319,9 +322,12 @@ async def echo_tts(
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 @app.post("/llm/query")
-async def llm_query(request: LLMRequest):
+async def llm_query(
+    file: UploadFile = File(...),
+    voice_id: str = Form("en-US-natalie")
+):
     """
-    Generate a response using Google's Gemini API for the given text input.
+    Full non-streaming pipeline: Accept audio, transcribe, send to LLM, generate TTS response.
     """
     if not GEMINI_API_KEY:
         raise HTTPException(
@@ -329,25 +335,127 @@ async def llm_query(request: LLMRequest):
             detail="Gemini API key not configured. Please set GEMINI_API_KEY in your environment variables."
         )
     
+    if not ASSEMBLYAI_API_KEY:
+        raise HTTPException(
+            status_code=500, 
+            detail="AssemblyAI API key not configured. Please set ASSEMBLYAI_API_KEY in your environment variables."
+        )
+    
+    if not MURF_API_KEY:
+        raise HTTPException(
+            status_code=500, 
+            detail="Murf API key not configured. Please set MURF_API_KEY in your environment variables."
+        )
+    
     try:
-        # Initialize the Gemini model (using the latest available model)
+        # Step 1: Save the uploaded audio file
+        file_extension = file.filename.split('.')[-1] if '.' in file.filename else 'wav'
+        unique_filename = f"{uuid.uuid4()}.{file_extension}"
+        file_path = UPLOAD_DIR / unique_filename
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        print(f"Audio file saved: {file_path}")
+        
+        # Step 2: Transcribe audio using AssemblyAI
+        print("Starting transcription...")
+        transcriber = aai.Transcriber()
+        transcript = transcriber.transcribe(str(file_path))
+        
+        if transcript.status == aai.TranscriptStatus.error:
+            raise HTTPException(status_code=500, detail=f"Transcription failed: {transcript.error}")
+        
+        transcribed_text = transcript.text
+        print(f"Transcription completed: {transcribed_text}")
+        
+        # Step 3: Send transcribed text to LLM (Gemini)
+        print("Generating LLM response...")
         model = genai.GenerativeModel('gemini-1.5-flash')
+        llm_response = model.generate_content("Generate a response to the following text in less than 2950 characters: " + transcribed_text)
         
-        # Generate response
-        response = model.generate_content(request.text)
-        
-        # Check if response was generated successfully
-        if not response.text:
+        if not llm_response.text:
             raise HTTPException(status_code=500, detail="Failed to generate response from Gemini API")
         
+        response_text = llm_response.text
+        print(f"LLM response generated: {response_text[:100]}...")
+        
+        # Step 4: Handle Murf's 3000 character limit
+        if len(response_text) > 3000:
+            print(f"Response too long ({len(response_text)} chars), truncating to 3000 chars")
+            response_text = response_text[:2997] + "..."
+        
+        # Step 5: Generate TTS audio using Murf
+        print("Generating TTS audio...")
+        murf_payload = {
+            "voiceId": voice_id,
+            "style": "Conversational",
+            "text": response_text,
+            "rate": 0,
+            "pitch": 0,
+            "sampleRate": 48000,
+            "format": "MP3",
+            "channelType": "MONO",
+            "pronunciationDictionary": {},
+            "encodeAsBase64": False,
+            "variation": 1,
+            "audioDuration": 0,
+            "modelVersion": "GEN2"
+        }
+        
+        murf_headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "api-key": MURF_API_KEY
+        }
+        
+        murf_response = requests.post(MURF_API_URL, json=murf_payload, headers=murf_headers)
+        
+        if not murf_response.ok:
+            print(f"Murf API error: {murf_response.status_code} - {murf_response.text}")
+            raise HTTPException(status_code=500, detail=f"TTS generation failed: {murf_response.text}")
+        
+        murf_data = murf_response.json()
+        
+        if not murf_data.get("audioFile"):
+            raise HTTPException(status_code=500, detail="No audio file received from Murf API")
+        
+        # Step 6: Save the TTS audio file
+        tts_filename = f"llm_response_{uuid.uuid4()}.mp3"
+        tts_file_path = UPLOAD_DIR / tts_filename
+        
+        # Download and save the audio file
+        audio_response = requests.get(murf_data["audioFile"])
+        if audio_response.ok:
+            with open(tts_file_path, "wb") as audio_file:
+                audio_file.write(audio_response.content)
+            print(f"TTS audio saved: {tts_file_path}")
+        else:
+            raise HTTPException(status_code=500, detail="Failed to download TTS audio file")
+        
+        # Step 7: Clean up the original audio file
+        try:
+            os.remove(file_path)
+            print(f"Cleaned up original audio file: {file_path}")
+        except Exception as cleanup_error:
+            print(f"Warning: Could not clean up file {file_path}: {cleanup_error}")
+        
+        # Step 8: Return the response
         return {
-            "query": request.text,
-            "response": response.text,
+            "transcription": transcribed_text,
+            "llm_response": response_text,
+            "audio_url": f"/uploads/{tts_filename}",
             "status": "success"
         }
         
     except Exception as e:
         print(f"Error in llm_query: {str(e)}")
+        # Clean up files in case of error
+        try:
+            if 'file_path' in locals() and os.path.exists(file_path):
+                os.remove(file_path)
+        except:
+            pass
         raise HTTPException(status_code=500, detail=f"An error occurred while processing your request: {str(e)}")
 
 # Make sure uploads directory is served

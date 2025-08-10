@@ -6,6 +6,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const ttsAudio = document.getElementById('ttsAudio');
     const ttsStatus = document.getElementById('ttsStatus');
     
+    // LLM Voice Agent Elements
+    const startLLMRecordingBtn = document.getElementById('startLLMRecording');
+    const stopLLMRecordingBtn = document.getElementById('stopLLMRecording');
+    const llmQuestionAudio = document.getElementById('llmQuestionAudio');
+    const llmResponseAudio = document.getElementById('llmResponseAudio');
+    const llmTranscriptionText = document.getElementById('llmTranscriptionText');
+    const llmResponseText = document.getElementById('llmResponseText');
+    const llmStatus = document.getElementById('llmStatus');
+    const llmVoiceSelect = document.getElementById('llmVoiceSelect');
+    
     // Echo Bot Elements
     const startRecordingBtn = document.getElementById('startRecording');
     const stopRecordingBtn = document.getElementById('stopRecording');
@@ -14,11 +24,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const recordingStatus = document.getElementById('recordingStatus');
     const uploadStatus = document.getElementById('uploadStatus');
     
+    // Helper functions for button state management
+    function setEchoBotButtonStates(startDisabled, stopDisabled) {
+        if (startRecordingBtn) {
+            startRecordingBtn.disabled = startDisabled;
+            console.log(`Echo Bot: Start button ${startDisabled ? 'disabled' : 'enabled'}`);
+        }
+        if (stopRecordingBtn) {
+            stopRecordingBtn.disabled = stopDisabled;
+            console.log(`Echo Bot: Stop button ${stopDisabled ? 'disabled' : 'enabled'}`);
+        }
+    }
+    
+    function setLLMButtonStates(startDisabled, stopDisabled) {
+        if (startLLMRecordingBtn) {
+            startLLMRecordingBtn.disabled = startDisabled;
+            console.log(`LLM: Start button ${startDisabled ? 'disabled' : 'enabled'}`);
+        }
+        if (stopLLMRecordingBtn) {
+            stopLLMRecordingBtn.disabled = stopDisabled;
+            console.log(`LLM: Stop button ${stopDisabled ? 'disabled' : 'enabled'}`);
+        }
+    }
+    
     let mediaRecorder;
     let audioChunks = [];
+    let llmMediaRecorder;
+    let llmAudioChunks = [];
     
     // Initialize audio elements
-    const audioElements = [echoAudio, echoTTSAudio];
+    const audioElements = [echoAudio, echoTTSAudio, llmQuestionAudio, llmResponseAudio];
 
     // Configure audio elements
     audioElements.forEach(audio => {
@@ -83,6 +118,88 @@ document.addEventListener('DOMContentLoaded', () => {
             statusElement.textContent = message;
             statusElement.className = isError ? 'status-message error' : 'status-message';
             console.log('Status:', message);
+        }
+    }
+    
+    // Function to process audio with LLM Voice Agent
+    async function processLLMVoiceAgent(blob) {
+        console.log('Starting LLM Voice Agent processing');
+        
+        // Update status
+        if (llmStatus) llmStatus.textContent = 'Processing your question...';
+        
+        try {
+            // 1. Create form data with the audio blob
+            const formData = new FormData();
+            formData.append('file', blob, 'recording.wav');
+            formData.append('voice_id', llmVoiceSelect ? llmVoiceSelect.value : 'en-US-natalie');
+            
+            // Update status
+            if (llmStatus) llmStatus.textContent = 'Sending to AI Voice Agent...';
+            
+            // 2. Send to /llm/query endpoint
+            console.log('Sending audio for LLM processing...');
+            const response = await fetch('/llm/query', {
+                method: 'POST',
+                body: formData
+            });
+            
+            console.log('LLM response status:', response.status);
+            const data = await response.json();
+            
+            if (!response.ok) {
+                console.error('LLM processing failed:', data);
+                throw new Error(data.detail || 'LLM processing failed');
+            }
+            
+            console.log('LLM result:', data);
+            
+            // 3. Update the question audio player with the original recording
+            if (llmQuestionAudio) {
+                const audioUrl = URL.createObjectURL(blob);
+                llmQuestionAudio.src = audioUrl;
+                llmQuestionAudio.controls = true;
+            }
+            
+            // 4. Update transcription
+            if (llmTranscriptionText && data.transcription) {
+                llmTranscriptionText.textContent = data.transcription;
+            }
+            
+            // 5. Update LLM response text
+            if (llmResponseText && data.llm_response) {
+                llmResponseText.textContent = data.llm_response;
+            }
+            
+            // 6. Update the response audio player with the AI-generated audio
+            if (llmResponseAudio && data.audio_url) {
+                llmResponseAudio.src = data.audio_url;
+                llmResponseAudio.controls = true;
+                
+                // Try to play the response audio
+                llmResponseAudio.play().catch(e => {
+                    console.log('Auto-play prevented, user interaction required');
+                });
+            } else if (!data.audio_url) {
+                console.warn('No response audio URL in response');
+                if (llmStatus) llmStatus.textContent = 'Warning: No response audio was generated';
+            }
+            
+            // 7. Update status
+            if (llmStatus) llmStatus.textContent = 'AI response ready! Click play to listen.';
+            
+            return { success: true, audioUrl: data.audio_url };
+            
+        } catch (error) {
+            console.error('Error in processLLMVoiceAgent:', error);
+            if (llmStatus) llmStatus.textContent = `Error: ${error.message}`;
+            if (llmTranscriptionText) {
+                llmTranscriptionText.textContent = 'Error processing recording';
+            }
+            if (llmResponseText) {
+                llmResponseText.textContent = 'Error generating response';
+            }
+            throw error;
         }
     }
     
@@ -273,9 +390,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Process the recording
                         await processEchoTTS(audioBlob);
                         
+                        // Re-enable start button only after processing is complete
+                        setEchoBotButtonStates(false, true); // start enabled, stop disabled
+                        
                     } catch (error) {
                         console.error('Error processing recording:', error);
                         updateStatus(`Error: ${error.message}`, true);
+                        // Re-enable start button even on error
+                        setEchoBotButtonStates(false, true); // start enabled, stop disabled
                     } finally {
                         // Clean up
                         if (window.mediaStream) {
@@ -288,8 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Start recording
                 mediaRecorder.start(100); // Collect data every 100ms
-                startRecordingBtn.disabled = true;
-                stopRecordingBtn.disabled = false;
+                setEchoBotButtonStates(true, false); // start disabled, stop enabled
                 updateStatus('Recording... Speak now!');
                 
                 // Auto-stop after 30 seconds to prevent very long recordings
@@ -302,8 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 console.error('Error accessing microphone:', error);
                 updateStatus(`Error: ${error.message}`, true);
-                startRecordingBtn.disabled = false;
-                stopRecordingBtn.disabled = true;
+                setEchoBotButtonStates(false, true); // start enabled, stop disabled
                 
                 // Clean up on error
                 if (window.mediaStream) {
@@ -314,23 +434,92 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         function stopRecording() {
-            const startRecordingBtn = document.getElementById('startRecording');
-            const stopRecordingBtn = document.getElementById('stopRecording');
-            
             if (mediaRecorder && mediaRecorder.state === 'recording') {
                 mediaRecorder.stop();
-                startRecordingBtn.disabled = false;
-                stopRecordingBtn.disabled = true;
+                // Keep both buttons disabled until processing is complete
+                setEchoBotButtonStates(true, true); // both disabled during processing
                 updateStatus('Processing your recording...');
             }
         }
         
-        // Event listeners for the recording buttons
+        // LLM Voice Agent Recording Functions
+        async function startLLMRecording() {
+            console.log('Starting LLM recording...');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                llmMediaRecorder = new MediaRecorder(stream);
+                llmAudioChunks = [];
+                
+                llmMediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        llmAudioChunks.push(event.data);
+                    }
+                };
+                
+                llmMediaRecorder.onstop = async () => {
+                    console.log('LLM recording stopped');
+                    const audioBlob = new Blob(llmAudioChunks, { type: 'audio/wav' });
+                    
+                    // Keep stop button disabled during processing
+                    if (stopLLMRecordingBtn) stopLLMRecordingBtn.disabled = true;
+                    if (startLLMRecordingBtn) startLLMRecordingBtn.disabled = true;
+                    
+                    // Process the audio with LLM Voice Agent
+                    try {
+                        await processLLMVoiceAgent(audioBlob);
+                        // Re-enable start button only after successful processing
+                        setLLMButtonStates(false, true); // start enabled, stop disabled
+                    } catch (error) {
+                        console.error('Error processing LLM audio:', error);
+                        // Re-enable start button even on error
+                        setLLMButtonStates(false, true); // start enabled, stop disabled
+                    }
+                    
+                    // Stop all tracks to release the microphone
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                llmMediaRecorder.start();
+                
+                // Update button states
+                setLLMButtonStates(true, false); // start disabled, stop enabled
+                
+                // Update status
+                if (llmStatus) llmStatus.textContent = 'Recording... Click "Stop Recording" when done.';
+                
+                console.log('LLM recording started successfully');
+                
+            } catch (error) {
+                console.error('Error accessing microphone for LLM:', error);
+                if (llmStatus) llmStatus.textContent = 'Error: Could not access microphone. Please check permissions.';
+            }
+        }
+        
+        function stopLLMRecording() {
+            if (llmMediaRecorder && llmMediaRecorder.state === 'recording') {
+                llmMediaRecorder.stop();
+                // Keep both buttons disabled until processing is complete
+                setLLMButtonStates(true, true); // both disabled during processing
+                if (llmStatus) llmStatus.textContent = 'Processing your question...';
+            }
+        }
+        
+        // Event listeners for the Echo Bot recording buttons
         startRecordingBtn.addEventListener('click', startRecording);
         stopRecordingBtn.addEventListener('click', stopRecording);
         
-        // Initially disable the stop button
-        stopRecordingBtn.disabled = true;
+        // Initially set proper button states for Echo Bot
+        setEchoBotButtonStates(false, true); // start enabled, stop disabled
+        
+        // Event listeners for the LLM Voice Agent recording buttons
+        if (startLLMRecordingBtn && stopLLMRecordingBtn) {
+            startLLMRecordingBtn.addEventListener('click', startLLMRecording);
+            stopLLMRecordingBtn.addEventListener('click', stopLLMRecording);
+            
+            // Initially set proper button states for LLM Voice Agent
+            setLLMButtonStates(false, true); // start enabled, stop disabled
+        }
         
         // Update the UI to show we're using Murf TTS
         if (recordingStatus) {
