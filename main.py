@@ -45,6 +45,9 @@ else:
 MURF_API_URL = "https://api.murf.ai/v1/speech/generate"
 MURF_VOICES_URL = "https://api.murf.ai/v1/studio/voice-ai/voice-list"
 
+# In-memory chat history storage (session_id -> list of messages)
+chat_history = {}
+
 # Request model for TTS endpoint
 class TTSRequest(BaseModel):
     text: str
@@ -457,6 +460,184 @@ async def llm_query(
         except:
             pass
         raise HTTPException(status_code=500, detail=f"An error occurred while processing your request: {str(e)}")
+
+@app.post("/agent/chat/{session_id}")
+async def agent_chat(
+    session_id: str,
+    file: UploadFile = File(...),
+    voice_id: str = Form("en-US-natalie")
+):
+    """
+    Chat endpoint with session-based history: Accept audio, transcribe, maintain chat history, 
+    send to LLM with context, generate TTS response.
+    """
+    if not GEMINI_API_KEY:
+        raise HTTPException(
+            status_code=500, 
+            detail="Gemini API key not configured. Please set GEMINI_API_KEY in your environment variables."
+        )
+    
+    if not ASSEMBLYAI_API_KEY:
+        raise HTTPException(
+            status_code=500, 
+            detail="AssemblyAI API key not configured. Please set ASSEMBLYAI_API_KEY in your environment variables."
+        )
+    
+    if not MURF_API_KEY:
+        raise HTTPException(
+            status_code=500, 
+            detail="Murf API key not configured. Please set MURF_API_KEY in your environment variables."
+        )
+    
+    try:
+        # Step 1: Save the uploaded audio file
+        file_extension = file.filename.split('.')[-1] if '.' in file.filename else 'wav'
+        unique_filename = f"{uuid.uuid4()}.{file_extension}"
+        file_path = UPLOAD_DIR / unique_filename
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        print(f"Audio file saved: {file_path}")
+        
+        # Step 2: Transcribe audio using AssemblyAI
+        print("Starting transcription...")
+        transcriber = aai.Transcriber()
+        transcript = transcriber.transcribe(str(file_path))
+        
+        if transcript.status == aai.TranscriptStatus.error:
+            raise HTTPException(status_code=500, detail=f"Transcription failed: {transcript.error}")
+        
+        transcribed_text = transcript.text
+        print(f"Transcription completed: {transcribed_text}")
+        
+        # Step 3: Get or initialize chat history for this session
+        if session_id not in chat_history:
+            chat_history[session_id] = []
+        
+        # Add user message to chat history
+        chat_history[session_id].append({
+            "role": "user",
+            "content": transcribed_text,
+            "timestamp": time.time()
+        })
+        
+        # Step 4: Prepare conversation context for LLM
+        conversation_context = "You are a helpful AI assistant. Please respond conversationally and keep your responses under 2950 characters.\n\n"
+        conversation_context += "Previous conversation:\n"
+        
+        # Include recent chat history (last 10 messages to avoid token limits)
+        recent_messages = chat_history[session_id][-10:]
+        for msg in recent_messages[:-1]:  # Exclude the current message
+            role = "User" if msg["role"] == "user" else "Assistant"
+            conversation_context += f"{role}: {msg['content']}\n"
+        
+        conversation_context += f"\nUser: {transcribed_text}\nAssistant:"
+        
+        # Step 5: Send to LLM (Gemini) with conversation context
+        print("Generating LLM response with chat history...")
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        llm_response = model.generate_content(conversation_context)
+        
+        if not llm_response.text:
+            raise HTTPException(status_code=500, detail="Failed to generate response from Gemini API")
+        
+        response_text = llm_response.text
+        print(f"LLM response generated: {response_text[:100]}...")
+        
+        # Step 6: Add assistant response to chat history
+        chat_history[session_id].append({
+            "role": "assistant",
+            "content": response_text,
+            "timestamp": time.time()
+        })
+        
+        # Step 7: Handle Murf's 3000 character limit
+        tts_text = response_text
+        if len(tts_text) > 3000:
+            print(f"Response too long ({len(tts_text)} chars), truncating to 3000 chars")
+            tts_text = tts_text[:2997] + "..."
+        
+        # Step 8: Generate TTS audio using Murf
+        print("Generating TTS audio...")
+        murf_payload = {
+            "voiceId": voice_id,
+            "style": "Conversational",
+            "text": tts_text,
+            "rate": 0,
+            "pitch": 0,
+            "sampleRate": 48000,
+            "format": "MP3",
+            "channelType": "MONO",
+            "pronunciationDictionary": {},
+            "encodeAsBase64": False,
+            "variation": 1,
+            "audioDuration": 0,
+            "modelVersion": "GEN2"
+        }
+        
+        murf_headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "api-key": MURF_API_KEY
+        }
+        
+        murf_response = requests.post(MURF_API_URL, json=murf_payload, headers=murf_headers)
+        
+        if not murf_response.ok:
+            print(f"Murf API error: {murf_response.status_code} - {murf_response.text}")
+            raise HTTPException(status_code=500, detail=f"TTS generation failed: {murf_response.text}")
+        
+        murf_data = murf_response.json()
+        
+        if not murf_data.get("audioFile"):
+            raise HTTPException(status_code=500, detail="No audio file received from Murf API")
+        
+        # Step 9: Save the TTS audio file
+        tts_filename = f"chat_response_{session_id}_{uuid.uuid4()}.mp3"
+        tts_file_path = UPLOAD_DIR / tts_filename
+        
+        # Download and save the audio file
+        audio_response = requests.get(murf_data["audioFile"])
+        if audio_response.ok:
+            with open(tts_file_path, "wb") as audio_file:
+                audio_file.write(audio_response.content)
+            print(f"TTS audio saved: {tts_file_path}")
+        else:
+            raise HTTPException(status_code=500, detail="Failed to download TTS audio file")
+        
+        # Step 10: Clean up the original audio file
+        try:
+            os.remove(file_path)
+            print(f"Cleaned up original audio file: {file_path}")
+        except Exception as cleanup_error:
+            print(f"Warning: Could not clean up file {file_path}: {cleanup_error}")
+        
+        # Step 11: Return the response with chat history info
+        # Include a trimmed recent history (last 10 messages) for UI rendering
+        recent_history = [
+            {"role": msg["role"], "content": msg["content"]}
+            for msg in chat_history[session_id][-10:]
+        ]
+        return {
+            "session_id": session_id,
+            "transcription": transcribed_text,
+            "llm_response": response_text,
+            "audio_url": f"/uploads/{tts_filename}",
+            "chat_history_length": len(chat_history[session_id]),
+            "recent_messages": recent_history,
+            "status": "success"
+        }
+        
+    except Exception as e:
+        print(f"Error in agent_chat: {str(e)}")
+        # Clean up files in case of error
+        try:
+            if 'file_path' in locals() and os.path.exists(file_path):
+                os.remove(file_path)
+        except:
+            pass
+        raise HTTPException(status_code=500, detail="Error processing chat request")
 
 # Make sure uploads directory is served
 @app.get("/uploads/{filename}")

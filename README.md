@@ -35,6 +35,28 @@
 
 ### Features
 
+#### Day 10 - Chat History with Session Management 💬
+- **New Endpoint**: Added `POST /agent/chat/{session_id}` for session-based conversations
+- **Session Management**:
+  - Unique session IDs generated for each conversation
+  - Session ID stored in URL for persistence
+  - In-memory chat history storage
+- **Conversation Flow**:
+  - Audio input → Speech-to-Text → Context-aware LLM response → Text-to-Speech
+  - Maintains full conversation context within each session
+- **Auto-Recording**:
+  - Automatically starts recording after TTS playback completes
+  - 1-second delay added for better user experience
+- **UI Enhancements**:
+  - Session ID visible in the URL
+  - Chat history display in the UI
+  - Visual distinction between user and assistant messages
+
+#### Day 9 - Bug Fixes and Code Cleanup 🐛
+- Added history feature to the UI
+- Added session management to the backend
+- Added backend api endpoint for history
+
 #### Day 9 - The Full Non-Streaming Pipeline ✨
 - **Complete AI Voice Agent**: Full audio-to-audio conversation pipeline
 - **Updated `/llm/query` endpoint**: Now accepts audio input instead of text

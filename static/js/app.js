@@ -1,4 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Session management
+    let sessionId = getOrCreateSessionId();
+    let isAutoRecordingEnabled = false;
+    
     // TTS Elements
     const ttsText = document.getElementById('ttsText');
     const voiceSelect = document.getElementById('voiceSelect');
@@ -15,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const llmResponseText = document.getElementById('llmResponseText');
     const llmStatus = document.getElementById('llmStatus');
     const llmVoiceSelect = document.getElementById('llmVoiceSelect');
+    const llmChatHistory = document.getElementById('llmChatHistory');
     
     // Echo Bot Elements
     const startRecordingBtn = document.getElementById('startRecording');
@@ -35,6 +40,31 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`Echo Bot: Stop button ${stopDisabled ? 'disabled' : 'enabled'}`);
         }
     }
+
+    // Render chat history messages
+    function renderChatHistory(messages) {
+        if (!llmChatHistory) return;
+        llmChatHistory.innerHTML = '';
+        messages.forEach(msg => {
+            const item = document.createElement('div');
+            item.className = `chat-message ${msg.role}`;
+            const roleLabel = msg.role === 'assistant' ? 'Assistant' : 'You';
+            item.innerHTML = `<div class="chat-role">${roleLabel}</div><div class="chat-content">${escapeHtml(msg.content)}</div>`;
+            llmChatHistory.appendChild(item);
+        });
+        // Auto-scroll to bottom
+        llmChatHistory.scrollTop = llmChatHistory.scrollHeight;
+    }
+
+    // Escape HTML to prevent injection
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
     
     function setLLMButtonStates(startDisabled, stopDisabled) {
         if (startLLMRecordingBtn) {
@@ -51,6 +81,22 @@ document.addEventListener('DOMContentLoaded', () => {
     let audioChunks = [];
     let llmMediaRecorder;
     let llmAudioChunks = [];
+    
+    // Session management functions
+    function getOrCreateSessionId() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let sessionId = urlParams.get('session_id');
+        
+        if (!sessionId) {
+            sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('session_id', sessionId);
+            window.history.replaceState({}, '', newUrl);
+        }
+        
+        console.log('Using session ID:', sessionId);
+        return sessionId;
+    }
     
     // Initialize audio elements
     const audioElements = [echoAudio, echoTTSAudio, llmQuestionAudio, llmResponseAudio];
@@ -121,9 +167,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // Function to process audio with LLM Voice Agent
+    // Function to process audio with LLM Voice Agent (now using chat endpoint)
     async function processLLMVoiceAgent(blob) {
-        console.log('Starting LLM Voice Agent processing');
+        console.log('Starting LLM Voice Agent processing with session:', sessionId);
         
         // Update status
         if (llmStatus) llmStatus.textContent = 'Processing your question...';
@@ -137,9 +183,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update status
             if (llmStatus) llmStatus.textContent = 'Sending to AI Voice Agent...';
             
-            // 2. Send to /llm/query endpoint
-            console.log('Sending audio for LLM processing...');
-            const response = await fetch('/llm/query', {
+            // 2. Send to /agent/chat/{session_id} endpoint
+            console.log('Sending audio for chat processing...');
+            const response = await fetch(`/agent/chat/${sessionId}`, {
                 method: 'POST',
                 body: formData
             });
@@ -153,6 +199,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             console.log('LLM result:', data);
+
+            // 2.5 Render chat history (recent messages)
+            if (llmChatHistory && Array.isArray(data.recent_messages)) {
+                renderChatHistory(data.recent_messages);
+            }
             
             // 3. Update the question audio player with the original recording
             if (llmQuestionAudio) {
@@ -176,6 +227,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 llmResponseAudio.src = data.audio_url;
                 llmResponseAudio.controls = true;
                 
+                // Add event listener for when audio ends to enable auto-recording
+                llmResponseAudio.addEventListener('ended', () => {
+                    console.log('AI response audio ended, enabling auto-recording');
+                    isAutoRecordingEnabled = true;
+                    if (llmStatus) {
+                        llmStatus.textContent = 'AI response finished. You can continue the conversation by speaking again.';
+                    }
+                    // Auto-start recording after a short delay
+                    setTimeout(() => {
+                        if (isAutoRecordingEnabled && !llmMediaRecorder) {
+                            console.log('Auto-starting recording for continued conversation');
+                            startLLMRecording();
+                        }
+                    }, 1000);
+                }, { once: true }); // Use once: true to avoid multiple listeners
+                
                 // Try to play the response audio
                 llmResponseAudio.play().catch(e => {
                     console.log('Auto-play prevented, user interaction required');
@@ -185,8 +252,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (llmStatus) llmStatus.textContent = 'Warning: No response audio was generated';
             }
             
-            // 7. Update status
-            if (llmStatus) llmStatus.textContent = 'AI response ready! Click play to listen.';
+            // 7. Update status with chat history info
+            const historyInfo = data.chat_history_length ? ` (${data.chat_history_length} messages in conversation)` : '';
+            if (llmStatus) llmStatus.textContent = `AI response ready! Click play to listen.${historyInfo}`;
             
             return { success: true, audioUrl: data.audio_url };
             
@@ -446,38 +514,40 @@ document.addEventListener('DOMContentLoaded', () => {
         async function startLLMRecording() {
             console.log('Starting LLM recording...');
             
+            // Disable auto-recording when user manually starts recording
+            isAutoRecordingEnabled = false;
+            
+            // Reset button states
+            setLLMButtonStates(true, false);
+            
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 llmMediaRecorder = new MediaRecorder(stream);
                 llmAudioChunks = [];
                 
                 llmMediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        llmAudioChunks.push(event.data);
-                    }
+                    console.log('LLM audio data available:', event.data.size, 'bytes');
+                    llmAudioChunks.push(event.data);
                 };
                 
                 llmMediaRecorder.onstop = async () => {
-                    console.log('LLM recording stopped');
+                    console.log('LLM recording stopped, processing audio...');
                     const audioBlob = new Blob(llmAudioChunks, { type: 'audio/wav' });
-                    
-                    // Keep stop button disabled during processing
-                    if (stopLLMRecordingBtn) stopLLMRecordingBtn.disabled = true;
-                    if (startLLMRecordingBtn) startLLMRecordingBtn.disabled = true;
+                    console.log('LLM audio blob created:', audioBlob.size, 'bytes');
                     
                     // Process the audio with LLM Voice Agent
                     try {
                         await processLLMVoiceAgent(audioBlob);
-                        // Re-enable start button only after successful processing
-                        setLLMButtonStates(false, true); // start enabled, stop disabled
                     } catch (error) {
                         console.error('Error processing LLM audio:', error);
-                        // Re-enable start button even on error
-                        setLLMButtonStates(false, true); // start enabled, stop disabled
                     }
+                    
+                    // Reset button states
+                    setLLMButtonStates(false, true);
                     
                     // Stop all tracks to release the microphone
                     stream.getTracks().forEach(track => track.stop());
+                    llmMediaRecorder = null;
                 };
                 
                 llmMediaRecorder.start();

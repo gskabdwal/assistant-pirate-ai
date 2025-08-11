@@ -393,6 +393,94 @@ audio:focus {
     transition: all 0.3s ease;
 }
 
+/* Chat History Styles */
+.chat-history-container {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: #F8FAFF;
+    border-radius: 8px;
+    border: 1px solid #E1E5EE;
+}
+
+.chat-history-container h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #10162F;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.chat-history {
+    max-height: 400px;
+    overflow-y: auto;
+    background-color: white;
+    border-radius: 6px;
+    border: 1px solid #DFE1E5;
+    padding: 15px;
+}
+
+.chat-message {
+    margin-bottom: 15px;
+    padding: 12px;
+    border-radius: 8px;
+    border-left: 4px solid #3A10E5;
+}
+
+.chat-message.user {
+    background-color: #F0F4FF;
+    border-left-color: #3A10E5;
+    margin-left: 20px;
+}
+
+.chat-message.assistant {
+    background-color: #F8FFF8;
+    border-left-color: #37C77F;
+    margin-right: 20px;
+}
+
+.chat-role {
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    color: #666;
+}
+
+.chat-message.user .chat-role {
+    color: #3A10E5;
+}
+
+.chat-message.assistant .chat-role {
+    color: #37C77F;
+}
+
+.chat-content {
+    font-size: 14px;
+    line-height: 1.5;
+    color: #333;
+    word-wrap: break-word;
+}
+
+/* Scrollbar styling for chat history */
+.chat-history::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-history::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.chat-history::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.chat-history::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
 /* Status Messages */
 .status-message, .status-box {
     max-width: 500px;
