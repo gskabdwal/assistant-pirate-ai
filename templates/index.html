@@ -19,33 +19,7 @@
         </div>
     </nav>
     
-    <div class="container">
-        <header>
-            <h1>Voice Agent</h1>
-            <p>Your AI-powered voice assistant and text-to-speech tool</p>
-        </header>
-        
-        <div class="tts-container">
-            <h2>Text-to-Speech</h2>
-            <div class="tts-form">
-                <textarea id="ttsText" placeholder="Enter text to convert to speech..."></textarea>
-                <div class="voice-selector">
-                    <label for="voiceSelect">Voice:</label>
-                    <select id="voiceSelect">
-                        <option value="en-IN-rohan">Rohan (English - India)</option>
-                        <option value="en-IN-alia">Alia (English - India)</option>
-                        <option value="en-IN-priya">Priya (English - India)</option>
-                        <option value="en-US-natalie">Natalie (US English)</option>
-                    </select>
-                </div>
-                <button id="ttsSubmitBtn" class="control-btn">Generate Speech</button>
-            </div>           
-            <div class="audio-player">
-                <h3>Audio Playback</h3>
-                <audio id="ttsAudio" controls></audio>
-                <div id="ttsStatus"></div>
-            </div>
-        </div>
+    <div class="container">       
         <div class="llm-voice-container">
             <h2>AI Voice Agent</h2>
             <div id="llmStatus" class="status-message">Press "Start Recording" to ask the AI a question</div>
@@ -76,30 +50,10 @@
                 <h3>AI Voice Response</h3>
                 <audio id="llmResponseAudio" controls></audio>
             </div>
-            <div class="chat-history-container">
-                <h3>Chat History</h3>
-                <div id="llmChatHistory" class="chat-history"></div>
-            </div>
         </div>
-        
-        <div class="echo-bot-container">
-            <h2>Echo Bot</h2>
-            <div id="echoBotStatus" class="status-message">Press "Start Recording" to begin</div>
-            <div class="recording-controls">
-                <button id="startRecording" class="control-btn">Start Recording</button>
-                <button id="stopRecording" class="control-btn" disabled>Stop Recording</button>
-            </div>
-            <div class="audio-player">
-                <h3>Your Recording</h3>
-                <audio id="echoAudio" controls></audio>
-                <h3>Transcription</h3>
-                <div id="transcriptionBox" class="transcription-box">
-                    <div id="transcriptionText">Your transcribed text will appear here...</div>
-                </div>
-                <br>
-                <h3>Generated Audio</h3>
-                <audio id="echoTTSAudio" controls></audio>
-            </div>
+        <div class="chat-history-container">
+            <h3>Chat History</h3>
+            <div id="llmChatHistory" class="chat-history"></div>
         </div>
     </div>
     

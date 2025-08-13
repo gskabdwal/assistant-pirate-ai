@@ -177,6 +177,10 @@ header p {
     border-top: 4px solid #3A10E5;
 }
 
+.container {
+    display: flex;
+}
+
 .transcript-container h2,
 .response-container h2,
 .tts-container h2,
@@ -396,7 +400,9 @@ audio:focus {
 /* Chat History Styles */
 .chat-history-container {
     margin-top: 30px;
+    width: 90%;
     padding: 20px;
+    max-width: 500px;
     background-color: #F8FAFF;
     border-radius: 8px;
     border: 1px solid #E1E5EE;
