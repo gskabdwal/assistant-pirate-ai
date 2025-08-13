@@ -4,15 +4,16 @@
 ### Project Structure
 
 ```
-├── main.py               # FastAPI server
-├── requirements.txt      # Python dependencies
-├── static/              # Static files
+├── main.py                  # FastAPI server
+├── test_error_handling.py   # Test suite for error handling
+├── requirements.txt         # Python dependencies
+├── static/                 # Static files
 │   ├── css/
-│   │   └── styles.css   # CSS styles
+│   │   └── styles.css      # CSS styles
 │   └── js/
-│       └── app.js       # Frontend JavaScript
+│       └── app.js          # Frontend JavaScript
 └── templates/
-    └── index.html       # Main HTML page
+    └── index.html          # Main HTML page
 ```
 
 ### Setup Instructions
@@ -23,17 +24,89 @@
    pip install -r requirements.txt
    ```
 
-2. **Run the server**
+2. **Set up environment variables**
+
+   Create a `.env` file in the project root with your API keys:
+   ```
+   MURF_API_KEY=your_murf_api_key_here
+   ASSEMBLYAI_API_KEY=your_assemblyai_api_key_here
+   GEMINI_API_KEY=your_gemini_api_key_here
+   ```
+
+3. **Run the server**
 
    ```bash
    python main.py
    ```
 
-3. **Access the application**
+4. **Run tests**
+
+   ```bash
+   python -m pytest test_error_handling.py -v
+   ```
+
+5. **Access the application**
 
    Open your browser and navigate to: http://localhost:8000
 
+### Error Handling & Testing (Day 11) 🛡️
+
+The application includes comprehensive error handling and a test suite to ensure reliability:
+
+#### Server-Side Error Handling:
+- **API Key Validation**: Graceful handling of missing or invalid API keys
+- **Audio Processing**: Robust error handling for audio file operations
+- **API Failures**: Automatic fallback to error responses when external services fail
+- **Session Management**: Safe handling of session data and conversation history
+
+#### Client-Side Error Handling:
+- **User Feedback**: Clear error messages displayed in the UI
+- **Fallback Audio**: Plays "I'm having trouble connecting right now" when errors occur
+- **Recovery**: Automatic retry mechanisms where appropriate
+- **Loading States**: Visual indicators during API calls
+
+#### Error Cases Handled:
+- Missing or invalid API keys (AssemblyAI, Gemini, Murf)
+- Invalid or corrupted audio files
+- Network timeouts and API rate limits
+- Session management errors
+- External API failures
+- Audio processing and playback issues
+
+#### Running Tests
+
+To run the test suite:
+```bash
+python -m pytest test_error_handling.py -v
+```
+
+#### Test Coverage:
+- API key validation
+- Audio file validation
+- Session management
+- Error response formats
+- Endpoint availability
+
 ### Features
+
+#### Day 11 - Robust Error Handling 🛡️
+- **Server Improvements**:
+  - Added comprehensive try-except blocks in all API endpoints
+  - Implemented consistent error response format
+  - Added fallback error messages for all external service calls
+  - Proper cleanup of temporary files even when errors occur
+
+- **Client Improvements**:
+  - Added error state handling in the UI
+  - Implemented fallback audio response for TTS failures
+  - Added user-friendly error messages
+  - Improved loading states and disabled buttons during processing
+
+- **Testing**:
+  - Added test cases for error scenarios
+  - Simulated API failures by removing API keys
+  - Verified fallback behavior
+  - Tested network failure scenarios
 
 #### Day 10 - Chat History with Session Management 💬
 - **New Endpoint**: Added `POST /agent/chat/{session_id}` for session-based conversations
@@ -237,6 +310,30 @@ Recommended browsers:
 - Microsoft Edge
 - Firefox
 - Safari (recent versions)
+
+### Testing Error Scenarios (Day 11)
+
+To test the error handling capabilities added in Day 11:
+
+1. **Missing API Keys**:
+   - Comment out any of the API keys in the `.env` file
+   - The application will show appropriate error messages in the UI
+   - A fallback audio message will play when TTS services are unavailable
+
+2. **Invalid Audio Files**:
+   - Try uploading a non-audio file (e.g., .txt, .jpg)
+   - The application will detect the invalid format
+   - A user-friendly error message will appear
+
+3. **Network Issues**:
+   - Test with a simulated slow network (using browser dev tools)
+   - The application handles timeouts gracefully
+   - Loading indicators are visible during processing
+
+4. **API Rate Limits**:
+   - Simulate rate limit responses from any of the APIs
+   - The application shows appropriate error messages
+   - Automatic retry logic is triggered where applicable
 
 ### Next Steps
 
