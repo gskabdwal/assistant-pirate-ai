@@ -1,5 +1,8 @@
 # 30 Days of Voice Agents
 
+## Overview
+
+This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 12, the UI is focused solely on the AI Voice Agent experience: record your voice, get a context-aware AI response (powered by Gemini), and hear it spoken back (via Murf TTS). Legacy Echo Bot and browser speech sections are deprecated and removed from the UI.
 
 ### Project Structure
 
@@ -88,6 +91,21 @@ python -m pytest test_error_handling.py -v
 - Endpoint availability
 
 ### Features
+
+#### Day 13 - Documentation Enhancements 📝
+- **README Improvements**:
+  - Clarified current scope and architecture with an Overview
+  - Documented UI focus on AI Voice Agent and deprecation of Echo Bot/speech UI
+  - Consolidated and updated browser compatibility notes
+  - Linked feature history for quick navigation
+
+#### Day 12 - UI Revamp: AI Voice Agent Only 🎛️
+- **UI Changes**:
+  - Removed Echo Bot and legacy browser speech-recognition sections from `templates/index.html`
+  - Streamlined layout to highlight the AI Voice Agent flow and chat history
+  - Clearer status messages and guidance on conversation flow
+- **Notes**:
+  - Echo Bot endpoints and references are deprecated at the UI level. The focus is the session-based AI Voice Agent.
 
 #### Day 11 - Robust Error Handling 🛡️
 - **Server Improvements**:
@@ -190,9 +208,11 @@ python -m pytest test_error_handling.py -v
 
 ### Browser Compatibility
 
-The application requires a modern browser that supports the following APIs:
-- Web Speech API (for speech recognition)
-- MediaRecorder API (for Echo Bot)
+The application requires a modern browser that supports:
+- MediaRecorder API (for recording audio queries for the AI Voice Agent)
+
+Notes:
+- Web Speech API-based browser recognition UI has been deprecated as of Day 12.
 
 Recommended browsers:
 - Google Chrome
@@ -229,6 +249,7 @@ Response:
 ### Using the AI Voice Agent Endpoint (Day 9)
 
 The `/llm/query` endpoint now accepts audio input for the full non-streaming pipeline.
+Note: As of Day 10+, the preferred endpoint for conversations with session memory is `POST /agent/chat/{session_id}`. The `/llm/query` endpoint remains for historical reference and simple single-turn processing.
 
 #### POST /llm/query
 
@@ -298,18 +319,6 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 **Processing Flow**:
 - 🎤 **Record** → 📝 **Transcribe** → 🤖 **AI Think** → 🔊 **AI Speak**
-
-### Browser Compatibility
-
-The application requires a modern browser that supports the following APIs:
-- Web Speech API (for speech recognition)
-- MediaRecorder API (for Echo Bot)
-
-Recommended browsers:
-- Google Chrome
-- Microsoft Edge
-- Firefox
-- Safari (recent versions)
 
 ### Testing Error Scenarios (Day 11)
 
