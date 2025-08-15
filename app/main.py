@@ -216,38 +216,84 @@ async def agent_chat(
         transcription, _ = await stt.transcribe_audio(file)
         
         if not transcription.strip():
-            raise HTTPException(status_code=400, detail="No speech detected in audio")
+            logger.warning(f"Empty transcription for session {session_id[:8]}")
+            raise HTTPException(status_code=400, detail="No speech detected in audio. Please speak clearly and try again.")
         
-        # Step 2: Get chat history for context
-        chat_history = chat.get_chat_history(session_id, limit=Config.MAX_CHAT_HISTORY)
-        
-        # Step 3: Generate LLM response with context
-        llm_response = await llm.generate_response(transcription, chat_history)
-        
-        # Step 4: Convert response to speech
-        audio_url = await tts.text_to_speech(llm_response, voice_id)
-        
-        # Step 5: Update chat history
+        # Step 2: Add user message to chat history
         chat.add_message(session_id, "user", transcription)
+        
+        # Step 3: Get updated chat history for context
+        chat_history = chat.get_chat_history(session_id)
+        
+        # Process the user's audio with the LLM
+        logger.info(f"Processing user message with LLM for session {session_id[:8]}...")
+        llm_response = await llm.generate_response(
+            user_input=transcription,  # Changed from user_message to user_input
+            chat_history=chat_history
+        )
+        
+        # Add assistant's response to chat history
         chat.add_message(session_id, "assistant", llm_response)
+        
+        # Generate TTS for the response
+        logger.info(f"Generating TTS for response in session {session_id[:8]}...")
+        audio_url = await tts.text_to_speech(
+            text=llm_response,
+            voice_id=voice_id
+        )
         
         processing_time = time.time() - start_time
         chat_history_length = chat.get_session_count(session_id)
         
-        logger.info(f"Voice agent completed in {processing_time:.2f}s for session {session_id[:8]}...")
+        # Get recent messages for the frontend in the format it expects
+        # The frontend expects an array of objects with 'role' and 'content' only
+        chat_history = chat.get_chat_history(session_id, limit=10)
+        recent_messages = [
+            {
+                'role': msg.get('role', 'user'),
+                'content': msg.get('content', '')
+            }
+            for msg in chat_history
+        ]
         
-        return VoiceAgentResponse(
+        logger.info(f"Voice agent completed in {processing_time:.2f}s for session {session_id[:8]}...")
+        logger.info(f"Returning {len(recent_messages)} recent messages to frontend")
+        
+        # Create response with all required fields
+        response = VoiceAgentResponse(
             session_id=session_id,
             transcription=transcription,
             llm_response=llm_response,
             audio_url=audio_url,
             chat_history_length=chat_history_length,
+            recent_messages=recent_messages,
             processing_time=processing_time
         )
         
+        # Log the response structure for debugging
+        logger.debug(f"Response data: {response.dict()}")
+        
+        return response
+        
+    except HTTPException:
+        # Re-raise HTTPExceptions as-is (they have proper status codes)
+        raise
     except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
         logger.error(f"Voice agent error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error details: {error_traceback}")
+        
+        # Log the current state of variables
+        logger.error(f"Session ID: {session_id}")
+        logger.error(f"Voice ID: {voice_id}")
+        logger.error(f"File info: {file.filename if file else 'No file'}")
+        
+        raise HTTPException(
+            status_code=500,
+            detail=f"Voice agent error: {str(e)}"
+        )
 
 
 @app.get("/chat/{session_id}/history", response_model=ChatHistoryResponse)

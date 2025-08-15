@@ -66,6 +66,13 @@ class STTService:
             transcription_text = transcript.text or ""
             confidence = transcript.confidence if hasattr(transcript, 'confidence') else None
             
+            # Debug logging for empty transcriptions
+            if not transcription_text.strip():
+                logger.warning(f"Empty transcription received from AssemblyAI")
+                logger.warning(f"Transcript status: {transcript.status}")
+                logger.warning(f"Audio file size: {len(content)} bytes")
+                logger.warning(f"Audio file name: {audio_file.filename}")
+            
             logger.info(f"Transcription completed in {processing_time:.2f}s: {transcription_text[:100]}...")
             
             return transcription_text, confidence

@@ -19,7 +19,7 @@ class LLMService:
             raise ValueError("Gemini API key is required")
         
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
         self.max_response_chars = 2950  # Keep under Murf's 3000 char limit
         
         logger.info("LLM Service initialized with Google Gemini")

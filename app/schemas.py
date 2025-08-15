@@ -70,6 +70,7 @@ class VoiceAgentResponse(BaseModel):
     llm_response: str
     audio_url: str
     chat_history_length: int
+    recent_messages: List[Dict[str, Any]] = []  # For frontend chat history
     processing_time: Optional[float] = None
 
 
