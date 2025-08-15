@@ -2,21 +2,42 @@
 
 ## Overview
 
-This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 12, the UI is focused solely on the AI Voice Agent experience: record your voice, get a context-aware AI response (powered by Gemini), and hear it spoken back (via Murf TTS). Legacy Echo Bot and browser speech sections are deprecated and removed from the UI.
+This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 14, the codebase has been completely refactored for better maintainability and scalability. The UI is focused solely on the AI Voice Agent experience: record your voice, get a context-aware AI response (powered by Gemini), and hear it spoken back (via Murf TTS).
+
+### Day 14 Refactoring Highlights
+
+- **Modular Architecture**: Separated concerns into distinct modules (services, schemas, config)
+- **Pydantic Models**: Added comprehensive request/response schemas for type safety
+- **Service Layer**: Isolated 3rd party API integrations (STT, TTS, LLM) into dedicated services
+- **Configuration Management**: Centralized configuration with proper validation
+- **Comprehensive Logging**: Added structured logging throughout the application
+- **Dependency Injection**: Used FastAPI's dependency system for better testability
+- **Error Handling**: Improved error handling with proper HTTP status codes
 
 ### Project Structure
 
 ```
-├── main.py                  # FastAPI server
-├── test_error_handling.py   # Test suite for error handling
+├── main.py                  # Application entry point
+├── app/                     # Main application package
+│   ├── __init__.py         # Package initialization
+│   ├── main.py             # FastAPI application with routes
+│   ├── config.py           # Configuration settings
+│   ├── schemas.py          # Pydantic models for API schemas
+│   └── services/           # Service layer for 3rd party integrations
+│       ├── __init__.py     # Services package initialization
+│       ├── stt_service.py  # Speech-to-Text service (AssemblyAI)
+│       ├── tts_service.py  # Text-to-Speech service (Murf AI)
+│       ├── llm_service.py  # LLM service (Google Gemini)
+│       └── chat_service.py # Chat history management
 ├── requirements.txt         # Python dependencies
 ├── static/                 # Static files
 │   ├── css/
 │   │   └── styles.css      # CSS styles
 │   └── js/
 │       └── app.js          # Frontend JavaScript
-└── templates/
-    └── index.html          # Main HTML page
+├── templates/
+│   └── index.html          # Main HTML page
+└── uploads/                # Directory for uploaded files
 ```
 
 ### Setup Instructions
