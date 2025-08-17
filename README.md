@@ -2,17 +2,27 @@
 
 ## Overview
 
-This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 14, the codebase has been completely refactored for better maintainability and scalability. The UI is focused solely on the AI Voice Agent experience: record your voice, get a context-aware AI response (powered by Gemini), and hear it spoken back (via Murf TTS).
+This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 16, the application now supports real-time audio streaming via WebSockets. The latest implementation focuses on streaming audio data from client to server and saving it to files, breaking away from the traditional request-response pattern.
 
-### Day 14 Refactoring Highlights
+### Day 16 - WebSocket Audio Streaming 🎵
 
-- **Modular Architecture**: Separated concerns into distinct modules (services, schemas, config)
-- **Pydantic Models**: Added comprehensive request/response schemas for type safety
-- **Service Layer**: Isolated 3rd party API integrations (STT, TTS, LLM) into dedicated services
-- **Configuration Management**: Centralized configuration with proper validation
-- **Comprehensive Logging**: Added structured logging throughout the application
-- **Dependency Injection**: Used FastAPI's dependency system for better testability
-- **Error Handling**: Improved error handling with proper HTTP status codes
+**Real-time Audio Streaming Implementation:**
+- **WebSocket Endpoint**: New `/ws/audio-stream` endpoint for real-time audio data transmission
+- **Client Streaming**: Modified recording logic to stream 100ms audio chunks via WebSocket instead of accumulating
+- **File Saving**: Server receives binary audio data and saves to unique files in uploads/ directory
+- **Session Management**: Each recording session gets a unique UUID for file identification
+- **Audio Format**: Uses WebM with Opus codec for efficient streaming
+- **Command Handling**: START_RECORDING and STOP_RECORDING commands for session control
+
+**Technical Implementation:**
+- **Frontend**: MediaRecorder with 100ms time slices streams audio chunks in real-time
+- **Backend**: WebSocket handler accumulates chunks and saves to files like `streamed_audio_{session_id}_{timestamp}.wav`
+- **No Processing**: Pure audio streaming without transcription, LLM, or TTS processing
+- **File Management**: Automatic cleanup and unique naming with session IDs and timestamps
+
+**Note**: This implementation intentionally breaks the existing UI to focus on the core WebSocket streaming functionality.
+
+
 
 ### Project Structure
 
@@ -111,7 +121,70 @@ python -m pytest test_error_handling.py -v
 - Error response formats
 - Endpoint availability
 
+### WebSocket Audio Streaming Usage (Day 16)
+
+#### Testing the WebSocket Audio Streaming
+
+1. **Start the server**:
+   ```bash
+   python main.py
+   ```
+
+2. **Open the application**: Navigate to http://localhost:8000
+
+3. **Test audio streaming**:
+   - Click "Start Recording" to begin streaming audio chunks via WebSocket
+   - Speak into your microphone (audio streams in real-time)
+   - Click "Stop Recording" to finish and save the audio file
+   - Check the `uploads/` directory for saved files like `streamed_audio_{session_id}_{timestamp}.wav`
+
+#### WebSocket Endpoint Details
+
+- **Endpoint**: `/ws/audio-stream`
+- **Protocol**: WebSocket (binary + text commands)
+- **Audio Format**: WebM with Opus codec
+- **Chunk Size**: 100ms intervals
+- **Commands**: 
+  - `START_RECORDING` - Begin new recording session
+  - `STOP_RECORDING` - Save accumulated audio chunks to file
+
+#### File Output
+
+Audio files are saved to the `uploads/` directory with the naming pattern:
+```
+streamed_audio_{unique_session_id}_{timestamp}.wav
+```
+
+Example: `streamed_audio_7d47a72f-8dc0-4163-a21a-914fb6e3de15_1755437664.wav`
+
 ### Features
+
+#### Day 15 - WebSocket Connection 🔌
+
+**Basic WebSocket Implementation:**
+- **WebSocket Endpoint**: Created `/ws` endpoint for real-time bidirectional communication
+- **Echo Functionality**: Server echoes back any messages received from clients
+- **Client Testing**: Tested with WebSocket clients like Postman for message exchange
+- **Connection Management**: Proper WebSocket connection lifecycle handling (open, message, close, error)
+- **Real-time Communication**: Foundation for streaming capabilities and real-time features
+
+**Technical Implementation:**
+- **FastAPI WebSocket**: Used FastAPI's built-in WebSocket support
+- **Message Handling**: Text message reception and echo response
+- **Error Handling**: Graceful handling of WebSocket disconnections and errors
+- **Logging**: Connection events and message exchanges logged for debugging
+
+**Note**: This was the foundational WebSocket implementation before advancing to audio streaming in Day 16.
+
+#### Day 14 Refactoring Highlights
+
+- **Modular Architecture**: Separated concerns into distinct modules (services, schemas, config)
+- **Pydantic Models**: Added comprehensive request/response schemas for type safety
+- **Service Layer**: Isolated 3rd party API integrations (STT, TTS, LLM) into dedicated services
+- **Configuration Management**: Centralized configuration with proper validation
+- **Comprehensive Logging**: Added structured logging throughout the application
+- **Dependency Injection**: Used FastAPI's dependency system for better testability
+- **Error Handling**: Improved error handling with proper HTTP status codes
 
 #### Day 13 - Documentation Enhancements 📝
 - **README Improvements**:

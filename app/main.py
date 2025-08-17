@@ -7,7 +7,7 @@ import uuid
 from typing import Dict, Any
 from pathlib import Path
 
-from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form, Depends
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -96,6 +96,21 @@ async def get_index(request: Request):
     """Serve the main application page."""
     logger.info("Serving main application page")
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/websocket-test", response_class=HTMLResponse)
+async def get_websocket_test():
+    """Serve the WebSocket test client."""
+    logger.info("Serving WebSocket test client")
+    test_file_path = Path(__file__).parent.parent / "websocket_test.html"
+    
+    if not test_file_path.exists():
+        raise HTTPException(status_code=404, detail="WebSocket test file not found")
+    
+    with open(test_file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    return HTMLResponse(content=content)
 
 
 @app.post("/tts", response_model=TTSResponse)
@@ -343,6 +358,93 @@ async def clear_chat_history(
     except Exception as e:
         logger.error(f"Clear chat history error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.websocket("/ws/audio-stream")
+async def audio_stream_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint for streaming audio data.
+    Receives binary audio chunks and saves them to a file.
+    """
+    await websocket.accept()
+    logger.info(f"Audio stream WebSocket connection established from {websocket.client}")
+    
+    # Generate unique filename for this session
+    session_id = str(uuid.uuid4())
+    audio_filename = f"streamed_audio_{session_id}_{int(time.time())}.wav"
+    audio_file_path = Config.UPLOAD_DIR / audio_filename
+    
+    # Ensure upload directory exists
+    Config.UPLOAD_DIR.mkdir(exist_ok=True)
+    
+    audio_chunks = []
+    
+    try:
+        await websocket.send_text(f"Ready to receive audio stream. Session: {session_id}")
+        
+        while True:
+            # Receive binary audio data
+            message = await websocket.receive()
+            
+            if message["type"] == "websocket.receive":
+                if "bytes" in message:
+                    # Handle binary audio data
+                    audio_data = message["bytes"]
+                    audio_chunks.append(audio_data)
+                    logger.debug(f"Received audio chunk: {len(audio_data)} bytes")
+                    
+                    # Send acknowledgment
+                    await websocket.send_text(f"Received chunk: {len(audio_data)} bytes")
+                    
+                elif "text" in message:
+                    # Handle text commands
+                    text_message = message["text"]
+                    logger.info(f"Received command: {text_message}")
+                    
+                    if text_message == "STOP_RECORDING":
+                        # Save all audio chunks to file
+                        if audio_chunks:
+                            with open(audio_file_path, 'wb') as f:
+                                for chunk in audio_chunks:
+                                    f.write(chunk)
+                            
+                            file_size = audio_file_path.stat().st_size
+                            logger.info(f"Saved audio stream to {audio_filename} ({file_size} bytes)")
+                            
+                            await websocket.send_text(f"Audio saved: {audio_filename} ({file_size} bytes)")
+                        else:
+                            await websocket.send_text("No audio data received")
+                        
+                        # Reset for next recording
+                        audio_chunks = []
+                        session_id = str(uuid.uuid4())
+                        audio_filename = f"streamed_audio_{session_id}_{int(time.time())}.wav"
+                        audio_file_path = Config.UPLOAD_DIR / audio_filename
+                        
+                    elif text_message == "START_RECORDING":
+                        audio_chunks = []
+                        await websocket.send_text(f"Started new recording session: {session_id}")
+                        
+                    else:
+                        await websocket.send_text(f"Unknown command: {text_message}")
+            
+    except WebSocketDisconnect:
+        logger.info(f"Audio stream WebSocket client disconnected: {websocket.client}")
+        
+        # Save any remaining audio data
+        if audio_chunks:
+            with open(audio_file_path, 'wb') as f:
+                for chunk in audio_chunks:
+                    f.write(chunk)
+            file_size = audio_file_path.stat().st_size
+            logger.info(f"Saved final audio stream to {audio_filename} ({file_size} bytes)")
+            
+    except Exception as e:
+        logger.error(f"Audio stream WebSocket error: {str(e)}")
+        try:
+            await websocket.close()
+        except:
+            pass
 
 
 @app.get("/health")

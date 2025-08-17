@@ -3,6 +3,8 @@ let sessionId;
 let isAutoRecordingEnabled = false;
 let llmMediaRecorder;
 let llmAudioChunks = [];
+let audioWebSocket;
+let isStreaming = false;
 
 // DOM Elements
 let startLLMRecordingBtn;
@@ -40,110 +42,121 @@ function setLLMButtonStates(startDisabled, stopDisabled) {
     }
 }
 
-// LLM Recording Functions
+// WebSocket connection functions
+function connectAudioWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/audio-stream`;
+    
+    audioWebSocket = new WebSocket(wsUrl);
+    
+    audioWebSocket.onopen = () => {
+        console.log('Audio WebSocket connected');
+        if (llmStatus) {
+            llmStatus.textContent = 'WebSocket connected - Ready to stream';
+        }
+    };
+    
+    audioWebSocket.onmessage = (event) => {
+        console.log('WebSocket message:', event.data);
+        if (llmStatus) {
+            llmStatus.textContent = event.data;
+        }
+    };
+    
+    audioWebSocket.onclose = () => {
+        console.log('Audio WebSocket disconnected');
+        if (llmStatus) {
+            llmStatus.textContent = 'WebSocket disconnected';
+        }
+        isStreaming = false;
+    };
+    
+    audioWebSocket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        if (llmStatus) {
+            llmStatus.textContent = 'WebSocket error';
+        }
+        isStreaming = false;
+    };
+}
+
+// Streaming Recording Functions
 async function startLLMRecording() {
     if (llmStatus) {
-        llmStatus.textContent = 'Preparing to record...';
+        llmStatus.textContent = 'Preparing to stream audio...';
     }
     
     try {
-        // Clear previous recording chunks
-        llmAudioChunks = [];
+        // Connect WebSocket if not connected
+        if (!audioWebSocket || audioWebSocket.readyState !== WebSocket.OPEN) {
+            connectAudioWebSocket();
+            // Wait for connection
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('WebSocket connection timeout')), 5000);
+                audioWebSocket.onopen = () => {
+                    clearTimeout(timeout);
+                    resolve();
+                };
+                audioWebSocket.onerror = () => {
+                    clearTimeout(timeout);
+                    reject(new Error('WebSocket connection failed'));
+                };
+            });
+        }
+        
+        // Send start recording command
+        audioWebSocket.send('START_RECORDING');
         
         // Request microphone access
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         
-        // Create media recorder
-        llmMediaRecorder = new MediaRecorder(stream);
+        // Create media recorder with shorter time slices for streaming
+        llmMediaRecorder = new MediaRecorder(stream, {
+            mimeType: 'audio/webm;codecs=opus'
+        });
         
-        // Event handlers for data available
+        // Event handlers for data available - stream chunks immediately
         llmMediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-                llmAudioChunks.push(event.data);
+            if (event.data.size > 0 && audioWebSocket && audioWebSocket.readyState === WebSocket.OPEN) {
+                // Convert blob to array buffer and send via WebSocket
+                event.data.arrayBuffer().then(buffer => {
+                    audioWebSocket.send(buffer);
+                });
             }
         };
         
         // Event handler for when recording stops
         llmMediaRecorder.onstop = async () => {
+            if (audioWebSocket && audioWebSocket.readyState === WebSocket.OPEN) {
+                audioWebSocket.send('STOP_RECORDING');
+            }
+            
+            // Stop all tracks in the stream
+            stream.getTracks().forEach(track => track.stop());
+            
             if (llmStatus) {
-                llmStatus.textContent = 'Processing your question...';
+                llmStatus.textContent = 'Audio streaming completed';
             }
             
-            // Create audio blob
-            const audioBlob = new Blob(llmAudioChunks, { type: 'audio/wav' });
-            
-            // Create form data
-            const formData = new FormData();
-            formData.append('file', audioBlob, 'recording.wav');
-            formData.append('voice_id', llmVoiceSelect ? llmVoiceSelect.value : 'en-US-natalie');
-            
-            // Call the API
-            try {
-                const response = await fetch(`/agent/chat/${sessionId}`, {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                
-                // Update UI with response
-                if (llmTranscriptionText) {
-                    llmTranscriptionText.textContent = data.transcription || 'No transcription available';
-                }
-                
-                if (llmResponseText) {
-                    llmResponseText.textContent = data.response || 'No response available';
-                }
-                
-                // Play the response audio if available
-                if (data.audio_url && llmResponseAudio) {
-                    llmResponseAudio.src = data.audio_url;
-                    llmResponseAudio.play().catch(e => {});
-                }
-                
-                // Update chat history if available
-                if (data.recent_messages && llmChatHistory) {
-                    updateChatHistory(data.recent_messages);
-                }
-                
-                if (llmStatus) {
-                    llmStatus.textContent = 'Ready';
-                }
-                
-            } catch (error) {
-                if (llmStatus) {
-                    llmStatus.textContent = 'Error: ' + (error.message || 'Failed to process recording');
-                }
-            }
-            
-            // Re-enable auto-recording if enabled
-            if (isAutoRecordingEnabled) {
-                setTimeout(() => {
-                    if (startLLMRecordingBtn && !startLLMRecordingBtn.disabled) {
-                        startLLMRecordingBtn.click();
-                    }
-                }, 1000);
-            }
+            isStreaming = false;
         };
         
-        // Start recording
-        llmMediaRecorder.start();
+        // Start recording with time slices for streaming (100ms chunks)
+        llmMediaRecorder.start(100);
+        isStreaming = true;
         
         // Update UI
         setLLMButtonStates(true, false);
         if (llmStatus) {
-            llmStatus.textContent = 'Recording... Click Stop when done';
+            llmStatus.textContent = 'Streaming audio... Click Stop when done';
         }
         
     } catch (error) {
         if (llmStatus) {
-            llmStatus.textContent = 'Error: Could not access microphone. Please check permissions.';
+            llmStatus.textContent = 'Error: ' + (error.message || 'Could not start audio streaming');
         }
         setLLMButtonStates(false, true);
+        isStreaming = false;
         throw error;
     }
 }
@@ -152,15 +165,11 @@ function stopLLMRecording() {
     if (llmMediaRecorder && llmMediaRecorder.state === 'recording') {
         llmMediaRecorder.stop();
     }
-    // Stop all tracks in the stream
-    if (llmMediaRecorder.stream) {
-        llmMediaRecorder.stream.getTracks().forEach(track => track.stop());
-    }
     
     setLLMButtonStates(false, true);
     
     if (llmStatus) {
-        llmStatus.textContent = 'Processing your question...';
+        llmStatus.textContent = 'Stopping audio stream...';
     }
 }
 
@@ -207,6 +216,9 @@ function initApp() {
     
     // Set initial button states
     setLLMButtonStates(false, true);
+    
+    // Connect WebSocket for audio streaming
+    connectAudioWebSocket();
 }
 
 // Set up all event listeners
