@@ -6,6 +6,11 @@ let llmAudioChunks = [];
 let audioWebSocket;
 let isStreaming = false;
 
+// Streaming transcription variables
+let transcribeWebSocket;
+let streamMediaRecorder;
+let isTranscribing = false;
+
 // DOM Elements
 let startLLMRecordingBtn;
 let stopLLMRecordingBtn;
@@ -16,6 +21,13 @@ let llmResponseText;
 let llmQuestionAudio;
 let llmResponseAudio;
 let llmVoiceSelect;
+
+// Streaming transcription DOM elements
+let startStreamRecordingBtn;
+let stopStreamRecordingBtn;
+let streamStatus;
+let partialTranscript;
+let finalTranscript;
 
 // Session management functions
 function getOrCreateSessionId() {
@@ -78,6 +90,217 @@ function connectAudioWebSocket() {
         }
         isStreaming = false;
     };
+}
+
+// Streaming Transcription Functions
+function connectTranscribeWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/transcribe-stream`;
+    
+    transcribeWebSocket = new WebSocket(wsUrl);
+    
+    transcribeWebSocket.onopen = () => {
+        console.log('Transcription WebSocket connected');
+        if (streamStatus) {
+            streamStatus.textContent = 'Connected - Ready for real-time transcription';
+        }
+    };
+    
+    transcribeWebSocket.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            console.log('Transcription message:', data);
+            
+            if (data.type === 'turn_transcript') {
+                if (data.end_of_turn) {
+                    // Final transcript - move to final display
+                    if (finalTranscript) {
+                        finalTranscript.textContent = data.text || 'No speech detected';
+                    }
+                    if (partialTranscript) {
+                        partialTranscript.textContent = 'Listening...';
+                    }
+                } else {
+                    // Partial transcript - show in partial display
+                    if (partialTranscript) {
+                        partialTranscript.textContent = data.text || 'Listening...';
+                    }
+                }
+            } else if (data.error) {
+                if (streamStatus) {
+                    streamStatus.textContent = `Error: ${data.error}`;
+                }
+            } else if (data.status) {
+                if (streamStatus) {
+                    streamStatus.textContent = data.message || data.status;
+                }
+            }
+        } catch (e) {
+            console.log('Non-JSON message:', event.data);
+            if (streamStatus) {
+                streamStatus.textContent = event.data;
+            }
+        }
+    };
+    
+    transcribeWebSocket.onclose = () => {
+        console.log('Transcription WebSocket disconnected');
+        if (streamStatus) {
+            streamStatus.textContent = 'Disconnected';
+        }
+        isTranscribing = false;
+    };
+    
+    transcribeWebSocket.onerror = (error) => {
+        console.error('Transcription WebSocket error:', error);
+        if (streamStatus) {
+            streamStatus.textContent = 'Connection error';
+        }
+        isTranscribing = false;
+    };
+}
+
+async function startStreamRecording() {
+    if (streamStatus) {
+        streamStatus.textContent = 'Preparing to start real-time transcription...';
+    }
+    
+    try {
+        // Connect WebSocket if not connected
+        if (!transcribeWebSocket || transcribeWebSocket.readyState !== WebSocket.OPEN) {
+            connectTranscribeWebSocket();
+            // Wait for connection
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('WebSocket connection timeout')), 5000);
+                transcribeWebSocket.onopen = () => {
+                    clearTimeout(timeout);
+                    resolve();
+                };
+                transcribeWebSocket.onerror = () => {
+                    clearTimeout(timeout);
+                    reject(new Error('WebSocket connection failed'));
+                };
+            });
+        }
+        
+        // Send start command
+        transcribeWebSocket.send('START_TRANSCRIPTION');
+        
+        // Request microphone access with specific constraints for AssemblyAI
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                sampleRate: 16000,
+                channelCount: 1,
+                echoCancellation: true,
+                noiseSuppression: true
+            }
+        });
+        
+        // Use Web Audio API to get raw PCM data for AssemblyAI
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 16000
+        });
+        const source = audioContext.createMediaStreamSource(stream);
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+        
+        processor.onaudioprocess = (event) => {
+            if (transcribeWebSocket && transcribeWebSocket.readyState === WebSocket.OPEN) {
+                const inputBuffer = event.inputBuffer;
+                const inputData = inputBuffer.getChannelData(0);
+                
+                // Convert float32 to int16 PCM
+                const pcmData = new Int16Array(inputData.length);
+                for (let i = 0; i < inputData.length; i++) {
+                    pcmData[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+                }
+                
+                // Send PCM data as ArrayBuffer
+                transcribeWebSocket.send(pcmData.buffer);
+            }
+        };
+        
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+        
+        // Store references for cleanup
+        streamMediaRecorder = {
+            audioContext,
+            source,
+            processor,
+            stream,
+            start: () => {
+                // Audio processing starts immediately when connected
+                console.log('Audio processing started');
+            },
+            stop: () => {
+                processor.disconnect();
+                source.disconnect();
+                audioContext.close();
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
+        
+        streamMediaRecorder.onstop = async () => {
+            if (transcribeWebSocket && transcribeWebSocket.readyState === WebSocket.OPEN) {
+                transcribeWebSocket.send('STOP_TRANSCRIPTION');
+            }
+            
+            // Stop all tracks
+            stream.getTracks().forEach(track => track.stop());
+            
+            if (streamStatus) {
+                streamStatus.textContent = 'Transcription stopped';
+            }
+            
+            isTranscribing = false;
+            setStreamButtonStates(false, true);
+        };
+        
+        // Start recording with short time slices for real-time streaming
+        streamMediaRecorder.start(100);
+        isTranscribing = true;
+        
+        // Update UI
+        setStreamButtonStates(true, false);
+        if (streamStatus) {
+            streamStatus.textContent = 'Streaming audio for real-time transcription...';
+        }
+        
+        // Clear previous transcripts
+        if (partialTranscript) {
+            partialTranscript.textContent = 'Listening...';
+        }
+        if (finalTranscript) {
+            finalTranscript.textContent = 'Waiting for speech...';
+        }
+        
+    } catch (error) {
+        console.error('Error starting stream recording:', error);
+        if (streamStatus) {
+            streamStatus.textContent = 'Error: ' + (error.message || 'Could not start transcription');
+        }
+        setStreamButtonStates(false, true);
+        isTranscribing = false;
+    }
+}
+
+function stopStreamRecording() {
+    if (streamMediaRecorder && streamMediaRecorder.state === 'recording') {
+        streamMediaRecorder.stop();
+    }
+    
+    if (streamStatus) {
+        streamStatus.textContent = 'Stopping transcription...';
+    }
+}
+
+function setStreamButtonStates(startDisabled, stopDisabled) {
+    if (startStreamRecordingBtn) {
+        startStreamRecordingBtn.disabled = startDisabled;
+    }
+    if (stopStreamRecordingBtn) {
+        stopStreamRecordingBtn.disabled = stopDisabled;
+    }
 }
 
 // Streaming Recording Functions
@@ -211,11 +434,19 @@ function initApp() {
     llmResponseAudio = document.getElementById('llmResponseAudio');
     llmVoiceSelect = document.getElementById('llmVoiceSelect');
     
+    // Initialize streaming transcription DOM elements
+    startStreamRecordingBtn = document.getElementById('startStreamRecording');
+    stopStreamRecordingBtn = document.getElementById('stopStreamRecording');
+    streamStatus = document.getElementById('streamStatus');
+    partialTranscript = document.getElementById('partialTranscript');
+    finalTranscript = document.getElementById('finalTranscript');
+    
     // Setup event listeners
     setupEventListeners();
     
     // Set initial button states
     setLLMButtonStates(false, true);
+    setStreamButtonStates(false, true);
     
     // Connect WebSocket for audio streaming
     connectAudioWebSocket();
@@ -229,6 +460,15 @@ function setupEventListeners() {
     
     if (stopLLMRecordingBtn) {
         stopLLMRecordingBtn.addEventListener('click', stopLLMRecording);
+    }
+    
+    // Streaming transcription event listeners
+    if (startStreamRecordingBtn) {
+        startStreamRecordingBtn.addEventListener('click', startStreamRecording);
+    }
+    
+    if (stopStreamRecordingBtn) {
+        stopStreamRecordingBtn.addEventListener('click', stopStreamRecording);
     }
 }
 

@@ -4,6 +4,8 @@ AI Voice Agent - Refactored FastAPI Application.
 import logging
 import time
 import uuid
+import asyncio
+import json
 from typing import Dict, Any
 from pathlib import Path
 
@@ -12,6 +14,18 @@ from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import uvicorn
+import assemblyai as aai
+from assemblyai.streaming.v3 import (
+    BeginEvent,
+    StreamingClient,
+    StreamingClientOptions,
+    StreamingError,
+    StreamingEvents,
+    StreamingParameters,
+    StreamingSessionParameters,
+    TerminationEvent,
+    TurnEvent,
+)
 
 from .config import Config
 from .schemas import (
@@ -445,6 +459,159 @@ async def audio_stream_websocket(websocket: WebSocket):
             await websocket.close()
         except:
             pass
+
+
+@app.websocket("/ws/transcribe-stream")
+async def transcribe_stream_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time audio transcription using AssemblyAI Universal-Streaming.
+    Receives binary audio chunks and streams transcription results.
+    """
+    await websocket.accept()
+    logger.info(f"Transcription stream WebSocket connection established from {websocket.client}")
+    
+    if not Config.ASSEMBLYAI_API_KEY:
+        await websocket.send_text(json.dumps({
+            "error": "AssemblyAI API key not configured"
+        }))
+        await websocket.close()
+        return
+    
+    # Create streaming client with new Universal-Streaming API
+    streaming_client = None
+    
+    # Store the main event loop for use in callbacks
+    main_loop = asyncio.get_running_loop()
+    
+    def on_begin(client, event: BeginEvent):
+        logger.info(f"AssemblyAI session started: {event.id}")
+        print(f"TRANSCRIPTION SESSION STARTED: {event.id}")
+    
+    def on_turn(client, event: TurnEvent):
+        logger.info(f"Turn transcript: {event.transcript} (end_of_turn: {event.end_of_turn})")
+        print(f"TRANSCRIPTION: {event.transcript}")
+        
+        # Send to WebSocket client using the stored main loop
+        asyncio.run_coroutine_threadsafe(
+            send_turn_to_client(websocket, event),
+            main_loop
+        )
+    
+    def on_terminated(client, event: TerminationEvent):
+        logger.info(f"AssemblyAI session terminated: {event.audio_duration_seconds} seconds processed")
+        print(f"SESSION ENDED: {event.audio_duration_seconds}s processed")
+    
+    def on_error(client, error: StreamingError):
+        logger.error(f"AssemblyAI streaming error: {error}")
+        print(f"TRANSCRIPTION ERROR: {error}")
+        # Send error to client without asyncio.create_task to avoid event loop issues
+        asyncio.run_coroutine_threadsafe(
+            send_error_to_client(websocket, str(error)), 
+            asyncio.get_event_loop()
+        )
+    
+    try:
+        # Create streaming client
+        streaming_client = StreamingClient(
+            StreamingClientOptions(
+                api_key=Config.ASSEMBLYAI_API_KEY,
+                api_host="streaming.assemblyai.com"
+            )
+        )
+        
+        # Set up event handlers
+        streaming_client.on(StreamingEvents.Begin, on_begin)
+        streaming_client.on(StreamingEvents.Turn, on_turn)
+        streaming_client.on(StreamingEvents.Termination, on_terminated)
+        streaming_client.on(StreamingEvents.Error, on_error)
+        
+        # Connect to AssemblyAI
+        streaming_client.connect(
+            StreamingParameters(
+                sample_rate=16000,
+                format_turns=True
+            )
+        )
+        
+        await websocket.send_text(json.dumps({
+            "status": "connected",
+            "message": "Ready to receive audio for real-time transcription"
+        }))
+        
+        while True:
+            message = await websocket.receive()
+            
+            if message["type"] == "websocket.receive":
+                if "bytes" in message:
+                    # Stream audio data to AssemblyAI
+                    audio_data = message["bytes"]
+                    streaming_client.stream(audio_data)
+                    logger.debug(f"Streamed {len(audio_data)} bytes to AssemblyAI")
+                    
+                elif "text" in message:
+                    text_message = message["text"]
+                    logger.info(f"Received command: {text_message}")
+                    
+                    if text_message == "STOP_TRANSCRIPTION":
+                        streaming_client.disconnect(terminate=True)
+                        await websocket.send_text(json.dumps({
+                            "status": "stopped",
+                            "message": "Transcription stopped"
+                        }))
+                        break
+                    elif text_message == "START_TRANSCRIPTION":
+                        await websocket.send_text(json.dumps({
+                            "status": "started",
+                            "message": "Transcription started"
+                        }))
+                    else:
+                        await websocket.send_text(json.dumps({
+                            "status": "unknown_command",
+                            "message": f"Unknown command: {text_message}"
+                        }))
+            
+    except WebSocketDisconnect:
+        logger.info(f"Transcription stream WebSocket client disconnected: {websocket.client}")
+        if streaming_client:
+            streaming_client.disconnect(terminate=True)
+        
+    except Exception as e:
+        logger.error(f"Transcription stream WebSocket error: {str(e)}")
+        try:
+            await websocket.send_text(json.dumps({
+                "error": str(e)
+            }))
+            await websocket.close()
+        except:
+            pass
+        finally:
+            if streaming_client:
+                streaming_client.disconnect(terminate=True)
+
+
+async def send_turn_to_client(websocket: WebSocket, turn_event: TurnEvent):
+    """Send turn event to WebSocket client."""
+    try:
+        await websocket.send_text(json.dumps({
+            "type": "turn_transcript",
+            "text": turn_event.transcript,
+            "end_of_turn": turn_event.end_of_turn,
+            "message": f"Transcript: {turn_event.transcript}"
+        }))
+    except Exception as e:
+        logger.error(f"Error sending turn to client: {str(e)}")
+
+
+async def send_error_to_client(websocket: WebSocket, error_message: str):
+    """Send error to WebSocket client."""
+    try:
+        await websocket.send_text(json.dumps({
+            "type": "error",
+            "error": error_message,
+            "message": f"Transcription error: {error_message}"
+        }))
+    except Exception as e:
+        logger.error(f"Error sending error to client: {str(e)}")
 
 
 @app.get("/health")

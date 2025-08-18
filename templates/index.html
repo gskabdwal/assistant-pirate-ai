@@ -19,7 +19,23 @@
         </div>
     </nav>
     
-    <div class="container">       
+    <div class="container">
+        <!-- Day 17: Real-time Transcription -->
+        <div class="streaming-transcription-container">
+            <h2>🎙️ Real-time Transcription (Day 17)</h2>
+            <div id="streamStatus" class="status-message">Press "Start Streaming" to begin real-time transcription</div>
+            <div class="recording-controls">
+                <button id="startStreamRecording" class="control-btn">Start Streaming</button>
+                <button id="stopStreamRecording" class="control-btn" disabled>Stop Streaming</button>
+            </div>
+            <div class="transcription-display">
+                <h3>Live Transcription</h3>
+                <div id="partialTranscript" class="partial-transcript">Partial transcription will appear here...</div>
+                <div id="finalTranscript" class="final-transcript">Final transcription will appear here...</div>
+            </div>
+        </div>
+        
+        <!-- Existing AI Voice Agent -->       
         <div class="llm-voice-container">
             <h2>AI Voice Agent</h2>
             <div id="llmStatus" class="status-message">Press "Start Recording" to ask the AI a question</div>

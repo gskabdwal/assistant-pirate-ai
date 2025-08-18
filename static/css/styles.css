@@ -400,72 +400,79 @@ audio:focus {
 /* Chat History Styles */
 .chat-history-container {
     margin-top: 30px;
-    width: 90%;
-    padding: 20px;
-    max-width: 500px;
-    background-color: #F8FAFF;
-    border-radius: 8px;
-    border: 1px solid #E1E5EE;
-}
-
-.chat-history-container h3 {
-    margin-top: 0;
-    margin-bottom: 15px;
-    color: #10162F;
-    font-size: 18px;
-    font-weight: 600;
 }
 
 .chat-history {
     max-height: 400px;
     overflow-y: auto;
-    background-color: white;
-    border-radius: 6px;
-    border: 1px solid #DFE1E5;
-    padding: 15px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+    background: #f9f9f9;
 }
 
 .chat-message {
-    margin-bottom: 15px;
-    padding: 12px;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
     border-radius: 8px;
-    border-left: 4px solid #3A10E5;
+    border-left: 4px solid #007bff;
 }
 
 .chat-message.user {
-    background-color: #F0F4FF;
-    border-left-color: #3A10E5;
-    margin-left: 20px;
+    background: #e3f2fd;
+    border-left-color: #2196f3;
 }
 
 .chat-message.assistant {
-    background-color: #F8FFF8;
-    border-left-color: #37C77F;
-    margin-right: 20px;
+    background: #f3e5f5;
+    border-left-color: #9c27b0;
 }
 
-.chat-role {
+.message-role {
     font-weight: 600;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 6px;
+    font-size: 0.875rem;
     color: #666;
+    margin-bottom: 0.25rem;
 }
 
-.chat-message.user .chat-role {
-    color: #3A10E5;
-}
-
-.chat-message.assistant .chat-role {
-    color: #37C77F;
-}
-
-.chat-content {
-    font-size: 14px;
-    line-height: 1.5;
+.message-content {
     color: #333;
-    word-wrap: break-word;
+    line-height: 1.5;
+}
+
+/* Streaming Transcription Styles */
+.streaming-transcription-container {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 2px solid #4CAF50;
+}
+
+.transcription-display {
+    margin-top: 1.5rem;
+}
+
+.partial-transcript {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    min-height: 60px;
+    font-style: italic;
+    color: #856404;
+}
+
+.final-transcript {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 8px;
+    padding: 1rem;
+    min-height: 60px;
+    font-weight: 500;
+    color: #155724;
 }
 
 /* Scrollbar styling for chat history */

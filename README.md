@@ -2,7 +2,31 @@
 
 ## Overview
 
-This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 16, the application now supports real-time audio streaming via WebSockets. The latest implementation focuses on streaming audio data from client to server and saving it to files, breaking away from the traditional request-response pattern.
+This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 17, the application now supports real-time audio transcription using AssemblyAI's streaming API. The latest implementation provides live speech-to-text capabilities with proper audio format handling and real-time display of transcription results.
+
+### Day 17 - Real-time Speech Transcription 🎙️
+
+**AssemblyAI Streaming Transcription Implementation:**
+- **WebSocket Endpoint**: New `/ws/transcribe-stream` endpoint for real-time audio transcription
+- **Universal-Streaming API**: Integrated AssemblyAI's latest streaming API for live transcription
+- **Real-time Processing**: Streams 16kHz mono PCM audio data for optimal transcription quality
+- **Live Display**: Shows both partial and final transcripts in real-time
+- **Event Loop Fix**: Resolved asyncio threading issues for stable WebSocket communication
+- **Audio Format Optimization**: Implemented Web Audio API for proper PCM data streaming
+
+**Technical Implementation:**
+- **Frontend**: Web Audio API captures raw PCM audio data at 16kHz sample rate
+- **Backend**: AssemblyAI Universal-Streaming client processes audio chunks in real-time
+- **UI Components**: Separate display areas for partial (yellow) and final (green) transcripts
+- **Error Handling**: Comprehensive error handling for WebSocket and transcription failures
+- **Audio Processing**: Converts float32 audio to int16 PCM format required by AssemblyAI
+
+**Key Features:**
+- Real-time speech-to-text with live partial results
+- Proper audio format handling (16kHz, 16-bit, mono PCM)
+- Visual feedback with color-coded transcript display
+- Console logging for debugging transcription events
+- Seamless integration with existing Voice Agent functionality
 
 ### Day 16 - WebSocket Audio Streaming 🎵
 
