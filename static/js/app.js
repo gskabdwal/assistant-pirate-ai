@@ -106,6 +106,58 @@ function connectTranscribeWebSocket() {
         }
     };
     
+    // Add CSS for the transcription UI if not already added
+    if (!document.getElementById('transcription-styles')) {
+        const style = document.createElement('style');
+        style.id = 'transcription-styles';
+        style.textContent = `
+            #transcription-container {
+                margin: 20px 0;
+                padding: 15px;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                background-color: #f9f9f9;
+            }
+            #final-transcript {
+                min-height: 60px;
+                padding: 10px;
+                margin-bottom: 10px;
+                background-color: #e8f5e9;
+                border-radius: 4px;
+                white-space: pre-wrap;
+                transition: background-color 0.5s ease;
+            }
+            #final-transcript.turn-end {
+                background-color: #c8e6c9;
+                transition: background-color 1s ease;
+            }
+            #partial-transcript {
+                min-height: 20px;
+                padding: 10px;
+                color: #666;
+                font-style: italic;
+                transition: all 0.3s ease;
+            }
+            #partial-transcript.active-transcription {
+                background-color: #fffde7;
+            }
+            #stream-status {
+                margin: 10px 0;
+                padding: 5px;
+                font-weight: bold;
+                transition: all 0.3s ease;
+            }
+            #stream-status.turn-detected {
+                color: #2e7d32;
+                font-weight: bold;
+            }
+            #stream-status.error {
+                color: #c62828;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
     transcribeWebSocket.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
@@ -113,26 +165,44 @@ function connectTranscribeWebSocket() {
             
             if (data.type === 'turn_transcript') {
                 if (data.end_of_turn) {
-                    // Final transcript - move to final display
+                    // End of turn - show final transcript with visual feedback
                     if (finalTranscript) {
                         finalTranscript.textContent = data.text || 'No speech detected';
+                        // Add visual feedback for end of turn
+                        finalTranscript.classList.add('turn-end');
+                        setTimeout(() => finalTranscript.classList.remove('turn-end'), 1000);
                     }
                     if (partialTranscript) {
                         partialTranscript.textContent = 'Listening...';
                     }
+                    // Scroll to show the latest transcription
+                    finalTranscript.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 } else {
-                    // Partial transcript - show in partial display
+                    // Partial transcript - show in partial display with visual feedback
                     if (partialTranscript) {
                         partialTranscript.textContent = data.text || 'Listening...';
+                        // Add visual feedback for active transcription
+                        partialTranscript.classList.add('active-transcription');
+                        setTimeout(() => partialTranscript.classList.remove('active-transcription'), 300);
                     }
+                }
+            } else if (data.type === 'turn_detected') {
+                // Visual feedback when a new turn is detected
+                console.log('Turn detected:', data);
+                if (streamStatus) {
+                    streamStatus.textContent = 'Turn detected - speaking...';
+                    streamStatus.classList.add('turn-detected');
+                    setTimeout(() => streamStatus.classList.remove('turn-detected'), 1000);
                 }
             } else if (data.error) {
                 if (streamStatus) {
                     streamStatus.textContent = `Error: ${data.error}`;
+                    streamStatus.classList.add('error');
                 }
             } else if (data.status) {
                 if (streamStatus) {
                     streamStatus.textContent = data.message || data.status;
+                    streamStatus.classList.remove('error');
                 }
             }
         } catch (e) {
@@ -161,27 +231,59 @@ function connectTranscribeWebSocket() {
 }
 
 async function startStreamRecording() {
+    // Reset any previous state
+    if (isTranscribing) {
+        await stopStreamRecording();
+    }
+    
+    // Reset UI
     if (streamStatus) {
         streamStatus.textContent = 'Preparing to start real-time transcription...';
+        streamStatus.className = '';
+    }
+    
+    if (partialTranscript) {
+        partialTranscript.textContent = 'Listening...';
+        partialTranscript.className = '';
+    }
+    
+    if (finalTranscript) {
+        finalTranscript.textContent = 'Waiting for speech...';
+        finalTranscript.className = '';
     }
     
     try {
-        // Connect WebSocket if not connected
-        if (!transcribeWebSocket || transcribeWebSocket.readyState !== WebSocket.OPEN) {
-            connectTranscribeWebSocket();
-            // Wait for connection
-            await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => reject(new Error('WebSocket connection timeout')), 5000);
-                transcribeWebSocket.onopen = () => {
-                    clearTimeout(timeout);
-                    resolve();
-                };
-                transcribeWebSocket.onerror = () => {
-                    clearTimeout(timeout);
-                    reject(new Error('WebSocket connection failed'));
-                };
-            });
+        // Close any existing WebSocket connection
+        if (transcribeWebSocket) {
+            transcribeWebSocket.close();
         }
+        
+        // Create new WebSocket connection
+        connectTranscribeWebSocket();
+        
+        // Wait for connection with timeout
+        await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('WebSocket connection timeout'));
+            }, 5000);
+            
+            const onOpen = () => {
+                clearTimeout(timeout);
+                transcribeWebSocket.removeEventListener('open', onOpen);
+                transcribeWebSocket.removeEventListener('error', onError);
+                resolve();
+            };
+            
+            const onError = (error) => {
+                clearTimeout(timeout);
+                transcribeWebSocket.removeEventListener('open', onOpen);
+                transcribeWebSocket.removeEventListener('error', onError);
+                reject(new Error('WebSocket connection failed'));
+            };
+            
+            transcribeWebSocket.addEventListener('open', onOpen);
+            transcribeWebSocket.addEventListener('error', onError);
+        });
         
         // Send start command
         transcribeWebSocket.send('START_TRANSCRIPTION');
@@ -285,13 +387,48 @@ async function startStreamRecording() {
 }
 
 function stopStreamRecording() {
+    // Stop the media recorder if it's active
     if (streamMediaRecorder && streamMediaRecorder.state === 'recording') {
         streamMediaRecorder.stop();
+        
+        // Stop all tracks in the stream
+        if (streamMediaRecorder.stream) {
+            streamMediaRecorder.stream.getTracks().forEach(track => track.stop());
+        }
     }
     
-    if (streamStatus) {
-        streamStatus.textContent = 'Stopping transcription...';
+    // Send stop command to the WebSocket if connected
+    if (transcribeWebSocket && transcribeWebSocket.readyState === WebSocket.OPEN) {
+        transcribeWebSocket.send('STOP_TRANSCRIPTION');
     }
+    
+    // Reset UI state
+    if (streamStatus) {
+        streamStatus.textContent = 'Transcription stopped';
+        streamStatus.className = ''; // Remove any status classes
+    }
+    
+    // Reset transcription displays
+    if (partialTranscript) {
+        partialTranscript.textContent = 'Start a new transcription to begin...';
+        partialTranscript.className = '';
+    }
+    
+    if (finalTranscript) {
+        finalTranscript.className = '';
+    }
+    
+    // Reset button states
+    setStreamButtonStates(false, true);
+    
+    // Close the WebSocket connection
+    if (transcribeWebSocket) {
+        transcribeWebSocket.close();
+        transcribeWebSocket = null;
+    }
+    
+    // Reset the flag
+    isTranscribing = false;
 }
 
 function setStreamButtonStates(startDisabled, stopDisabled) {

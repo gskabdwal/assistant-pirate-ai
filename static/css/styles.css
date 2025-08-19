@@ -179,6 +179,8 @@ header p {
 
 .container {
     display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .transcript-container h2,

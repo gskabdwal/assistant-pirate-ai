@@ -2,51 +2,7 @@
 
 ## Overview
 
-This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 17, the application now supports real-time audio transcription using AssemblyAI's streaming API. The latest implementation provides live speech-to-text capabilities with proper audio format handling and real-time display of transcription results.
-
-### Day 17 - Real-time Speech Transcription 🎙️
-
-**AssemblyAI Streaming Transcription Implementation:**
-- **WebSocket Endpoint**: New `/ws/transcribe-stream` endpoint for real-time audio transcription
-- **Universal-Streaming API**: Integrated AssemblyAI's latest streaming API for live transcription
-- **Real-time Processing**: Streams 16kHz mono PCM audio data for optimal transcription quality
-- **Live Display**: Shows both partial and final transcripts in real-time
-- **Event Loop Fix**: Resolved asyncio threading issues for stable WebSocket communication
-- **Audio Format Optimization**: Implemented Web Audio API for proper PCM data streaming
-
-**Technical Implementation:**
-- **Frontend**: Web Audio API captures raw PCM audio data at 16kHz sample rate
-- **Backend**: AssemblyAI Universal-Streaming client processes audio chunks in real-time
-- **UI Components**: Separate display areas for partial (yellow) and final (green) transcripts
-- **Error Handling**: Comprehensive error handling for WebSocket and transcription failures
-- **Audio Processing**: Converts float32 audio to int16 PCM format required by AssemblyAI
-
-**Key Features:**
-- Real-time speech-to-text with live partial results
-- Proper audio format handling (16kHz, 16-bit, mono PCM)
-- Visual feedback with color-coded transcript display
-- Console logging for debugging transcription events
-- Seamless integration with existing Voice Agent functionality
-
-### Day 16 - WebSocket Audio Streaming 🎵
-
-**Real-time Audio Streaming Implementation:**
-- **WebSocket Endpoint**: New `/ws/audio-stream` endpoint for real-time audio data transmission
-- **Client Streaming**: Modified recording logic to stream 100ms audio chunks via WebSocket instead of accumulating
-- **File Saving**: Server receives binary audio data and saves to unique files in uploads/ directory
-- **Session Management**: Each recording session gets a unique UUID for file identification
-- **Audio Format**: Uses WebM with Opus codec for efficient streaming
-- **Command Handling**: START_RECORDING and STOP_RECORDING commands for session control
-
-**Technical Implementation:**
-- **Frontend**: MediaRecorder with 100ms time slices streams audio chunks in real-time
-- **Backend**: WebSocket handler accumulates chunks and saves to files like `streamed_audio_{session_id}_{timestamp}.wav`
-- **No Processing**: Pure audio streaming without transcription, LLM, or TTS processing
-- **File Management**: Automatic cleanup and unique naming with session IDs and timestamps
-
-**Note**: This implementation intentionally breaks the existing UI to focus on the core WebSocket streaming functionality.
-
-
+This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 18, we've enhanced the real-time transcription UI with improved layout and state management. The latest updates include a centered design and proper cleanup of resources during transcription sessions.
 
 ### Project Structure
 
@@ -182,6 +138,70 @@ streamed_audio_{unique_session_id}_{timestamp}.wav
 Example: `streamed_audio_7d47a72f-8dc0-4163-a21a-914fb6e3de15_1755437664.wav`
 
 ### Features
+
+#### Day 18 - Enhanced Transcription UI & State Management 🎛️
+
+**UI and State Management Improvements:**
+- **Centered Layout**: Implemented a clean, centered design for better user experience
+- **Responsive Container**: Added proper flexbox centering for the transcription interface
+- **State Management**: Enhanced recording state handling for more reliable start/stop functionality
+- **Resource Cleanup**: Improved cleanup of WebSocket connections and audio resources
+- **UI Feedback**: Better visual feedback during different transcription states
+
+**Technical Implementation:**
+- **Flexbox Layout**: Used `justify-content: center` and `align-items: center` for perfect centering
+- **State Cleanup**: Properly reset UI elements and states when stopping transcription
+- **Error Handling**: Enhanced error states and recovery mechanisms
+- **Code Organization**: Improved separation of concerns in the frontend JavaScript
+
+**Key Benefits:**
+- More polished and professional user interface
+- Smoother user experience with proper state transitions
+- More reliable cleanup of resources
+- Better error handling and user feedback
+
+
+#### Day 17 - Real-time Speech Transcription 🎙️
+
+**AssemblyAI Streaming Transcription Implementation:**
+- **WebSocket Endpoint**: New `/ws/transcribe-stream` endpoint for real-time audio transcription
+- **Universal-Streaming API**: Integrated AssemblyAI's latest streaming API for live transcription
+- **Real-time Processing**: Streams 16kHz mono PCM audio data for optimal transcription quality
+- **Live Display**: Shows both partial and final transcripts in real-time
+- **Event Loop Fix**: Resolved asyncio threading issues for stable WebSocket communication
+- **Audio Format Optimization**: Implemented Web Audio API for proper PCM data streaming
+
+**Technical Implementation:**
+- **Frontend**: Web Audio API captures raw PCM audio data at 16kHz sample rate
+- **Backend**: AssemblyAI Universal-Streaming client processes audio chunks in real-time
+- **UI Components**: Separate display areas for partial (yellow) and final (green) transcripts
+- **Error Handling**: Comprehensive error handling for WebSocket and transcription failures
+- **Audio Processing**: Converts float32 audio to int16 PCM format required by AssemblyAI
+
+**Key Features:**
+- Real-time speech-to-text with live partial results
+- Proper audio format handling (16kHz, 16-bit, mono PCM)
+- Visual feedback with color-coded transcript display
+- Console logging for debugging transcription events
+- Seamless integration with existing Voice Agent functionality
+
+#### Day 16 - WebSocket Audio Streaming 🎵
+
+**Real-time Audio Streaming Implementation:**
+- **WebSocket Endpoint**: New `/ws/audio-stream` endpoint for real-time audio data transmission
+- **Client Streaming**: Modified recording logic to stream 100ms audio chunks via WebSocket instead of accumulating
+- **File Saving**: Server receives binary audio data and saves to unique files in uploads/ directory
+- **Session Management**: Each recording session gets a unique UUID for file identification
+- **Audio Format**: Uses WebM with Opus codec for efficient streaming
+- **Command Handling**: START_RECORDING and STOP_RECORDING commands for session control
+
+**Technical Implementation:**
+- **Frontend**: MediaRecorder with 100ms time slices streams audio chunks in real-time
+- **Backend**: WebSocket handler accumulates chunks and saves to files like `streamed_audio_{session_id}_{timestamp}.wav`
+- **No Processing**: Pure audio streaming without transcription, LLM, or TTS processing
+- **File Management**: Automatic cleanup and unique naming with session IDs and timestamps
+
+**Note**: This implementation intentionally breaks the existing UI to focus on the core WebSocket streaming functionality.
 
 #### Day 15 - WebSocket Connection 🔌
 

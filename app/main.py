@@ -489,13 +489,25 @@ async def transcribe_stream_websocket(websocket: WebSocket):
     
     def on_turn(client, event: TurnEvent):
         logger.info(f"Turn transcript: {event.transcript} (end_of_turn: {event.end_of_turn})")
-        print(f"TRANSCRIPTION: {event.transcript}")
+        print(f"TRANSCRIPTION: {event.transcript} (end_of_turn: {event.end_of_turn})")
         
         # Send to WebSocket client using the stored main loop
         asyncio.run_coroutine_threadsafe(
             send_turn_to_client(websocket, event),
             main_loop
         )
+        
+        # If this is the start of a new turn, send a turn_detected event
+        if not event.end_of_turn and event.transcript.strip():
+            logger.info(f"New turn detected: {event.transcript[:50]}...")
+            asyncio.run_coroutine_threadsafe(
+                websocket.send_text(json.dumps({
+                    "type": "turn_detected",
+                    "text": event.transcript,
+                    "timestamp": time.time()
+                })),
+                main_loop
+            )
     
     def on_terminated(client, event: TerminationEvent):
         logger.info(f"AssemblyAI session terminated: {event.audio_duration_seconds} seconds processed")
@@ -592,12 +604,21 @@ async def transcribe_stream_websocket(websocket: WebSocket):
 async def send_turn_to_client(websocket: WebSocket, turn_event: TurnEvent):
     """Send turn event to WebSocket client."""
     try:
-        await websocket.send_text(json.dumps({
+        message = {
             "type": "turn_transcript",
             "text": turn_event.transcript,
             "end_of_turn": turn_event.end_of_turn,
-            "message": f"Transcript: {turn_event.transcript}"
-        }))
+            "timestamp": time.time()
+        }
+        
+        # Add additional metadata if available
+        if hasattr(turn_event, 'speaker'):
+            message["speaker"] = turn_event.speaker
+            
+        if hasattr(turn_event, 'confidence'):
+            message["confidence"] = turn_event.confidence
+            
+        await websocket.send_text(json.dumps(message))
     except Exception as e:
         logger.error(f"Error sending turn to client: {str(e)}")
 
