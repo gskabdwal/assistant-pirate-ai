@@ -3,8 +3,9 @@ Large Language Model service using Google Gemini.
 """
 import google.generativeai as genai
 import logging
+import asyncio
 import time
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, AsyncGenerator
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,60 @@ class LLMService:
             raise HTTPException(
                 status_code=500,
                 detail=f"LLM generation error: {str(e)}"
+            )
+    
+    async def stream_response(
+        self,
+        user_input: str,
+        chat_history: Optional[List[Dict[str, Any]]] = None
+    ) -> AsyncGenerator[str, None]:
+        """
+        Stream response from Gemini LLM.
+        
+        Args:
+            user_input: User's input text
+            chat_history: Previous conversation history
+            
+        Yields:
+            Chunks of the generated response text
+            
+        Raises:
+            HTTPException: If generation fails
+        """
+        try:
+            # Build conversation context
+            context = self._build_context(user_input, chat_history)
+            logger.info(f"Streaming LLM response for: {user_input[:100]}...")
+            
+            # Stream response
+            response = self.model.generate_content(
+                context,
+                stream=True
+            )
+            
+            accumulated_text = ""
+            
+            for chunk in response:
+                if chunk.text:
+                    chunk_text = chunk.text
+                    accumulated_text += chunk_text
+                    
+                    # Check if we've exceeded the maximum response length
+                    if len(accumulated_text) > self.max_response_chars:
+                        logger.warning("Response exceeds maximum length, truncating")
+                        accumulated_text = accumulated_text[:self.max_response_chars - 50] + "..."
+                        yield accumulated_text
+                        break
+                    
+                    yield chunk_text
+            
+            logger.info("LLM streaming completed")
+            
+        except Exception as e:
+            logger.error(f"Error in LLM streaming: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"LLM streaming error: {str(e)}"
             )
     
     def _build_context(

@@ -35,9 +35,9 @@
             </div>
         </div>
         
-        <!-- Existing AI Voice Agent       
+        <!-- AI Voice Agent with Streaming -->
         <div class="llm-voice-container">
-            <h2>AI Voice Agent</h2>
+            <h2>AI Voice Agent with Streaming (Day 19)</h2>
             <div id="llmStatus" class="status-message">Press "Start Recording" to ask the AI a question</div>
             <div class="recording-controls">
                 <button id="startLLMRecording" class="control-btn">Start Recording</button>
@@ -46,10 +46,9 @@
             <div class="voice-selector">
                 <label for="llmVoiceSelect">AI Voice:</label>
                 <select id="llmVoiceSelect">
-                    <option value="en-IN-rohan">Rohan (English - India)</option>
+                    <option value="en-IN-rohan" selected>Rohan (English - India)</option>
                     <option value="en-IN-alia">Alia (English - India)</option>
                     <option value="en-IN-priya">Priya (English - India)</option>
-                    <option value="en-US-natalie">Natalie (US English)</option>
                 </select>
             </div>
             <div class="audio-player">
@@ -59,9 +58,10 @@
                 <div id="llmTranscriptionBox" class="transcription-box">
                     <div id="llmTranscriptionText">Your question will appear here...</div>
                 </div>
-                <h3>AI Response</h3>
-                <div id="llmResponseBox" class="transcription-box">
-                    <div id="llmResponseText">AI response will appear here...</div>
+                <h3>AI Response (Streaming)</h3>
+                <div id="llmResponseBox" class="transcription-box streaming-box">
+                    <div id="llmStreamingText" class="streaming-text"></div>
+                    <div id="llmResponseText" class="final-text">AI response will appear here...</div>
                 </div>
                 <h3>AI Voice Response</h3>
                 <audio id="llmResponseAudio" controls></audio>
@@ -70,7 +70,7 @@
         <div class="chat-history-container">
             <h3>Chat History</h3>
             <div id="llmChatHistory" class="chat-history"></div>
-        </div> -->
+        </div>
     </div>
     
     <script src="{{ url_for('static', path='/js/app.js') }}"></script>

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 18, we've enhanced the real-time transcription UI with improved layout and state management. The latest updates include a centered design and proper cleanup of resources during transcription sessions.
+This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 19, we've implemented streaming LLM responses for real-time AI conversations. The latest updates include WebSocket-based streaming responses from Google Gemini with seamless integration into the voice pipeline.
 
 ### Project Structure
 
@@ -101,7 +101,43 @@ python -m pytest test_error_handling.py -v
 - Error response formats
 - Endpoint availability
 
-### WebSocket Audio Streaming Usage (Day 16)
+### WebSocket Streaming Usage
+
+#### Day 19 - LLM Response Streaming
+
+**Testing the Streaming LLM Pipeline:**
+
+1. **Start the server**:
+   ```bash
+   python main.py
+   ```
+
+2. **Open the application**: Navigate to http://localhost:8000
+
+3. **Test streaming LLM responses**:
+   - Click "Start Recording" in the AI Voice Agent section
+   - Ask a question (e.g., "Tell me about artificial intelligence")
+   - Click "Stop Recording"
+   - Watch the real-time streaming response appear in the UI
+   - Listen to the AI voice response after streaming completes
+
+**Expected Console Output:**
+```
+📤 Sending to LLM streaming endpoint: {text: "your question"}
+🚀 LLM streaming started
+📝 Streaming chunk: [AI response text]
+📝 Streaming chunk: [more AI response text]
+✅ LLM streaming completed
+🔊 Generating TTS for response
+```
+
+#### WebSocket Endpoints
+
+- **`/ws/llm-stream`**: Streaming LLM responses (Day 19)
+- **`/ws/audio-stream`**: Real-time audio streaming (Day 16)
+- **`/ws/transcribe-stream`**: Real-time transcription (Day 17)
+
+#### Day 16 - Audio Streaming
 
 #### Testing the WebSocket Audio Streaming
 
@@ -120,7 +156,16 @@ python -m pytest test_error_handling.py -v
 
 #### WebSocket Endpoint Details
 
-- **Endpoint**: `/ws/audio-stream`
+**LLM Streaming (`/ws/llm-stream`):**
+- **Protocol**: WebSocket (JSON messages)
+- **Input**: `{text, session_id, voice_id, chat_history}`
+- **Output**: Streaming message types:
+  - `start` - Streaming begins
+  - `chunk` - Response text chunks
+  - `end` - Streaming complete with final response
+  - `error` - Error messages
+
+**Audio Streaming (`/ws/audio-stream`):**
 - **Protocol**: WebSocket (binary + text commands)
 - **Audio Format**: WebM with Opus codec
 - **Chunk Size**: 100ms intervals
@@ -138,6 +183,37 @@ streamed_audio_{unique_session_id}_{timestamp}.wav
 Example: `streamed_audio_7d47a72f-8dc0-4163-a21a-914fb6e3de15_1755437664.wav`
 
 ### Features
+
+#### Day 19 - Streaming LLM Responses 🚀
+
+**Real-time AI Response Streaming:**
+- **WebSocket Integration**: New `/ws/llm-stream` endpoint for streaming LLM responses in real-time
+- **Google Gemini Streaming**: Integrated Google Gemini's streaming API for live AI responses
+- **Seamless Pipeline**: Complete audio → transcription → streaming LLM → TTS pipeline
+- **Real-time UI Updates**: Live display of streaming AI responses as they generate
+- **Error Handling**: Comprehensive error handling for streaming failures with fallback to non-streaming
+- **Session Management**: Maintains conversation context across streaming sessions
+
+**Technical Implementation:**
+- **Frontend**: WebSocket client handles streaming message types (start, chunk, end, error)
+- **Backend**: Google Gemini streaming API yields response chunks asynchronously
+- **UI Components**: Real-time text updates during streaming with final response display
+- **Fallback System**: Automatic fallback to non-streaming LLM if WebSocket unavailable
+- **TTS Integration**: Automatic TTS generation after streaming completes
+
+**Key Features:**
+- Real-time streaming of AI responses for immediate user feedback
+- Maintains full conversation context and session management
+- Seamless integration with existing voice pipeline (audio → STT → streaming LLM → TTS)
+- Visual feedback with streaming text display and completion indicators
+- Robust error handling and automatic fallback mechanisms
+
+**Pipeline Flow:**
+1. **Record Audio** → AssemblyAI Transcription
+2. **Send to Streaming LLM** → Google Gemini streaming response
+3. **Real-time Display** → Live text updates as AI responds
+4. **Generate TTS** → Murf AI converts final response to speech
+5. **Auto-playback** → AI voice response plays automatically
 
 #### Day 18 - Enhanced Transcription UI & State Management 🎛️
 

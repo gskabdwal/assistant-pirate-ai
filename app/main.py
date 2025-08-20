@@ -33,6 +33,7 @@ from .schemas import (
     VoiceAgentResponse, ErrorResponse, ChatHistoryResponse
 )
 from .services import STTService, TTSService, LLMService, ChatService
+from typing import AsyncGenerator, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -397,50 +398,61 @@ async def audio_stream_websocket(websocket: WebSocket):
         await websocket.send_text(f"Ready to receive audio stream. Session: {session_id}")
         
         while True:
-            # Receive binary audio data
-            message = await websocket.receive()
-            
-            if message["type"] == "websocket.receive":
-                if "bytes" in message:
-                    # Handle binary audio data
-                    audio_data = message["bytes"]
-                    audio_chunks.append(audio_data)
-                    logger.debug(f"Received audio chunk: {len(audio_data)} bytes")
-                    
-                    # Send acknowledgment
-                    await websocket.send_text(f"Received chunk: {len(audio_data)} bytes")
-                    
-                elif "text" in message:
-                    # Handle text commands
-                    text_message = message["text"]
-                    logger.info(f"Received command: {text_message}")
-                    
-                    if text_message == "STOP_RECORDING":
-                        # Save all audio chunks to file
-                        if audio_chunks:
-                            with open(audio_file_path, 'wb') as f:
-                                for chunk in audio_chunks:
-                                    f.write(chunk)
+            try:
+                # Receive message from WebSocket
+                message = await websocket.receive()
+                
+                # Handle disconnect messages
+                if message["type"] == "websocket.disconnect":
+                    logger.info("WebSocket disconnect message received")
+                    break
+                
+                if message["type"] == "websocket.receive":
+                    if "bytes" in message:
+                        # Handle binary audio data
+                        audio_data = message["bytes"]
+                        audio_chunks.append(audio_data)
+                        logger.debug(f"Received audio chunk: {len(audio_data)} bytes")
+                        
+                        # Send acknowledgment (less frequent to avoid flooding)
+                        if len(audio_chunks) % 10 == 0:  # Every 10th chunk
+                            await websocket.send_text(f"Received {len(audio_chunks)} chunks")
+                        
+                    elif "text" in message:
+                        # Handle text commands
+                        text_message = message["text"]
+                        logger.info(f"Received command: {text_message}")
+                        
+                        if text_message == "STOP_RECORDING":
+                            # Save all audio chunks to file
+                            if audio_chunks:
+                                with open(audio_file_path, 'wb') as f:
+                                    for chunk in audio_chunks:
+                                        f.write(chunk)
+                                
+                                file_size = audio_file_path.stat().st_size
+                                logger.info(f"Saved audio stream to {audio_filename} ({file_size} bytes)")
+                                
+                                await websocket.send_text(f"Audio saved: {audio_filename} ({file_size} bytes)")
+                            else:
+                                await websocket.send_text("No audio data received")
                             
-                            file_size = audio_file_path.stat().st_size
-                            logger.info(f"Saved audio stream to {audio_filename} ({file_size} bytes)")
+                            # Reset for next recording
+                            audio_chunks = []
+                            session_id = str(uuid.uuid4())
+                            audio_filename = f"streamed_audio_{session_id}_{int(time.time())}.wav"
+                            audio_file_path = Config.UPLOAD_DIR / audio_filename
                             
-                            await websocket.send_text(f"Audio saved: {audio_filename} ({file_size} bytes)")
+                        elif text_message == "START_RECORDING":
+                            audio_chunks = []
+                            await websocket.send_text(f"Started new recording session: {session_id}")
+                            
                         else:
-                            await websocket.send_text("No audio data received")
-                        
-                        # Reset for next recording
-                        audio_chunks = []
-                        session_id = str(uuid.uuid4())
-                        audio_filename = f"streamed_audio_{session_id}_{int(time.time())}.wav"
-                        audio_file_path = Config.UPLOAD_DIR / audio_filename
-                        
-                    elif text_message == "START_RECORDING":
-                        audio_chunks = []
-                        await websocket.send_text(f"Started new recording session: {session_id}")
-                        
-                    else:
-                        await websocket.send_text(f"Unknown command: {text_message}")
+                            await websocket.send_text(f"Unknown command: {text_message}")
+                            
+            except WebSocketDisconnect:
+                logger.info("WebSocket disconnected during receive")
+                break
             
     except WebSocketDisconnect:
         logger.info(f"Audio stream WebSocket client disconnected: {websocket.client}")
@@ -456,6 +468,86 @@ async def audio_stream_websocket(websocket: WebSocket):
     except Exception as e:
         logger.error(f"Audio stream WebSocket error: {str(e)}")
         try:
+            await websocket.close()
+        except:
+            pass
+
+
+@app.websocket("/ws/llm-stream")
+async def llm_stream_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint for streaming LLM responses.
+    Receives text input and streams back the LLM's response in chunks.
+    """
+    await websocket.accept()
+    logger.info(f"LLM stream WebSocket connection established from {websocket.client}")
+    
+    if not Config.GEMINI_API_KEY:
+        await websocket.send_text(json.dumps({
+            "error": "Gemini API key not configured"
+        }))
+        await websocket.close()
+        return
+    
+    llm = get_llm_service()
+    chat = get_chat_service()
+    
+    try:
+        while True:
+            message = await websocket.receive()
+            
+            if message["type"] == "websocket.receive":
+                if "text" in message:
+                    data = json.loads(message["text"])
+                    user_input = data.get("text", "")
+                    session_id = data.get("session_id", "default-session")
+                    
+                    if not user_input:
+                        await websocket.send_text(json.dumps({
+                            "type": "error",
+                            "message": "No text provided in request"
+                        }))
+                        continue
+                    
+                    # Get chat history for context
+                    chat_history = chat.get_chat_history(session_id, limit=10)
+                    
+                    # Send start of stream
+                    await websocket.send_text(json.dumps({
+                        "type": "start",
+                        "message": "Starting LLM stream"
+                    }))
+                    
+                    # Stream the LLM response
+                    full_response = ""
+                    async for chunk in llm.stream_response(user_input, chat_history):
+                        full_response += chunk
+                        await websocket.send_text(json.dumps({
+                            "type": "chunk",
+                            "text": chunk,
+                            "is_complete": False
+                        }))
+                    
+                    # Send end of stream
+                    await websocket.send_text(json.dumps({
+                        "type": "end",
+                        "text": full_response,
+                        "is_complete": True
+                    }))
+                    
+                    # Update chat history
+                    chat.add_message(session_id, "user", user_input)
+                    chat.add_message(session_id, "assistant", full_response)
+                    
+    except WebSocketDisconnect:
+        logger.info(f"LLM stream WebSocket client disconnected: {websocket.client}")
+    except Exception as e:
+        logger.error(f"LLM stream WebSocket error: {str(e)}")
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "message": str(e)
+            }))
             await websocket.close()
         except:
             pass
