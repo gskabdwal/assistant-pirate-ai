@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 19, we've implemented streaming LLM responses for real-time AI conversations. The latest updates include WebSocket-based streaming responses from Google Gemini with seamless integration into the voice pipeline.
+This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 20, we've implemented Murf WebSocket streaming for real-time TTS generation. The latest updates include streaming LLM responses that are sent directly to Murf's WebSocket API for immediate audio generation with base64 audio output.
 
 ### Project Structure
 
@@ -103,6 +103,40 @@ python -m pytest test_error_handling.py -v
 
 ### WebSocket Streaming Usage
 
+#### Day 20 - Murf WebSocket TTS Streaming
+
+**Testing the Murf WebSocket Pipeline:**
+
+1. **Start the server**:
+   ```bash
+   python main.py
+   ```
+
+2. **Test Murf WebSocket streaming**:
+   ```bash
+   python test_day20_murf_websocket.py
+   ```
+
+3. **Expected behavior**:
+   - LLM streams response chunks in real-time
+   - Each chunk is sent to Murf WebSocket API
+   - Murf returns base64 encoded audio chunks
+   - Base64 audio is printed to console
+   - Uses static context_id to avoid context limit errors
+
+**Expected Console Output:**
+```
+📤 Sending to LLM streaming endpoint: {text: "your question"}
+🚀 LLM streaming started
+📝 Streaming chunk: [AI response text]
+================================================================================
+MURF TTS BASE64 AUDIO (first 100 chars):
+UklGRjQAAABXQVZFZm10IBAAAAABAAEAK...
+================================================================================
+✅ LLM streaming completed
+🔊 Murf WebSocket TTS completed
+```
+
 #### Day 19 - LLM Response Streaming
 
 **Testing the Streaming LLM Pipeline:**
@@ -133,6 +167,7 @@ python -m pytest test_error_handling.py -v
 
 #### WebSocket Endpoints
 
+- **`/ws/llm-to-murf`**: LLM streaming to Murf WebSocket TTS (Day 20)
 - **`/ws/llm-stream`**: Streaming LLM responses (Day 19)
 - **`/ws/audio-stream`**: Real-time audio streaming (Day 16)
 - **`/ws/transcribe-stream`**: Real-time transcription (Day 17)
@@ -183,6 +218,39 @@ streamed_audio_{unique_session_id}_{timestamp}.wav
 Example: `streamed_audio_7d47a72f-8dc0-4163-a21a-914fb6e3de15_1755437664.wav`
 
 ### Features
+
+#### Day 20 - Murf WebSocket TTS Streaming 🎵
+
+**Real-time LLM to TTS Pipeline:**
+- **WebSocket Integration**: New `/ws/llm-to-murf` endpoint for streaming LLM responses directly to Murf TTS
+- **Murf WebSocket API**: Integrated Murf's WebSocket API for real-time text-to-speech generation
+- **Base64 Audio Output**: Receives and prints base64 encoded audio chunks to console
+- **Static Context ID**: Uses consistent context_id to avoid Murf API context limit errors
+- **Streaming Pipeline**: Complete audio → transcription → streaming LLM → streaming TTS pipeline
+- **Real-time Processing**: LLM chunks are immediately sent to Murf for parallel TTS generation
+
+**Technical Implementation:**
+- **Frontend**: WebSocket client handles both LLM chunks and TTS audio data
+- **Backend**: Streams LLM response chunks directly to Murf WebSocket API
+- **Audio Processing**: Receives base64 encoded audio chunks from Murf in real-time
+- **Console Output**: Prints base64 audio data to console as per requirements
+- **Error Handling**: Comprehensive error handling for both LLM and TTS streaming failures
+
+**Key Features:**
+- Real-time streaming from LLM response directly to TTS generation
+- Base64 audio output printed to console for debugging
+- Static context_id prevents API context limit issues
+- Seamless integration with existing voice pipeline
+- Parallel processing of LLM chunks and TTS generation
+- Robust error handling and connection management
+
+**Pipeline Flow:**
+1. **User Input** → WebSocket message with text and session info
+2. **Streaming LLM** → Google Gemini streams response chunks
+3. **Real-time TTS** → Each chunk sent to Murf WebSocket API
+4. **Audio Generation** → Murf returns base64 encoded audio chunks
+5. **Console Output** → Base64 audio printed to console
+6. **Client Response** → Audio data sent back to client
 
 #### Day 19 - Streaming LLM Responses 🚀
 

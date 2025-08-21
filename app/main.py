@@ -9,7 +9,7 @@ import json
 from typing import Dict, Any
 from pathlib import Path
 
-from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form, Depends, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form, Depends, WebSocket, WebSocketDisconnect, WebSocketException
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -33,6 +33,7 @@ from .schemas import (
     VoiceAgentResponse, ErrorResponse, ChatHistoryResponse
 )
 from .services import STTService, TTSService, LLMService, ChatService
+from fastapi.responses import JSONResponse
 from typing import AsyncGenerator, Optional
 
 logger = logging.getLogger(__name__)
@@ -476,8 +477,8 @@ async def audio_stream_websocket(websocket: WebSocket):
 @app.websocket("/ws/llm-stream")
 async def llm_stream_websocket(websocket: WebSocket):
     """
-    WebSocket endpoint for streaming LLM responses.
-    Receives text input and streams back the LLM's response in chunks.
+    WebSocket endpoint for streaming LLM responses with Murf WebSocket TTS.
+    Receives text input, streams LLM response, and sends to Murf for audio generation.
     """
     await websocket.accept()
     logger.info(f"LLM stream WebSocket connection established from {websocket.client}")
@@ -491,6 +492,7 @@ async def llm_stream_websocket(websocket: WebSocket):
     
     llm = get_llm_service()
     chat = get_chat_service()
+    tts = get_tts_service()
     
     try:
         while True:
@@ -501,6 +503,7 @@ async def llm_stream_websocket(websocket: WebSocket):
                     data = json.loads(message["text"])
                     user_input = data.get("text", "")
                     session_id = data.get("session_id", "default-session")
+                    voice_id = data.get("voice_id", "en-US-natalie")
                     
                     if not user_input:
                         await websocket.send_text(json.dumps({
@@ -508,6 +511,8 @@ async def llm_stream_websocket(websocket: WebSocket):
                             "message": "No text provided in request"
                         }))
                         continue
+                    
+                    logger.info(f"🚀 Day 20: Starting LLM streaming + Murf WebSocket TTS for: {user_input[:50]}...")
                     
                     # Get chat history for context
                     chat_history = chat.get_chat_history(session_id, limit=10)
@@ -528,7 +533,7 @@ async def llm_stream_websocket(websocket: WebSocket):
                             "is_complete": False
                         }))
                     
-                    # Send end of stream
+                    # Send end of LLM stream
                     await websocket.send_text(json.dumps({
                         "type": "end",
                         "text": full_response,
@@ -538,6 +543,45 @@ async def llm_stream_websocket(websocket: WebSocket):
                     # Update chat history
                     chat.add_message(session_id, "user", user_input)
                     chat.add_message(session_id, "assistant", full_response)
+                    
+                    # Day 20: Send the complete LLM response to Murf WebSocket for TTS
+                    if full_response.strip():
+                        logger.info(f"🎵 Sending LLM response to Murf WebSocket TTS: {len(full_response)} chars")
+                        
+                        await websocket.send_text(json.dumps({
+                            "type": "tts_start",
+                            "message": "Starting Murf WebSocket TTS generation"
+                        }))
+                        
+                        try:
+                            # Stream TTS from Murf WebSocket
+                            async for tts_chunk in tts.stream_text_to_speech(
+                                text=full_response,
+                                voice_id=voice_id
+                            ):
+                                # Send TTS chunk to client
+                                await websocket.send_text(json.dumps({
+                                    "type": "tts_chunk",
+                                    "data": tts_chunk,
+                                    "is_final": tts_chunk.get("final", False)
+                                }))
+                                
+                                # The base64 audio logging is already handled in the TTS service
+                                
+                            await websocket.send_text(json.dumps({
+                                "type": "tts_complete",
+                                "message": "Murf WebSocket TTS generation completed"
+                            }))
+                            
+                        except Exception as tts_error:
+                            import traceback
+                            error_details = traceback.format_exc()
+                            logger.error(f"❌ Murf WebSocket TTS error: {str(tts_error)}")
+                            logger.error(f"❌ TTS Error traceback: {error_details}")
+                            await websocket.send_text(json.dumps({
+                                "type": "tts_error",
+                                "message": f"TTS generation failed: {str(tts_error)}"
+                            }))
                     
     except WebSocketDisconnect:
         logger.info(f"LLM stream WebSocket client disconnected: {websocket.client}")
@@ -551,6 +595,106 @@ async def llm_stream_websocket(websocket: WebSocket):
             await websocket.close()
         except:
             pass
+
+
+@app.websocket("/ws/llm-to-murf")
+async def llm_to_murf_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint that streams LLM responses to Murf TTS and returns audio.
+    """
+    await websocket.accept()
+    logger.info(f"LLM to Murf WebSocket connection established from {websocket.client}")
+    
+    # Get dependencies
+    try:
+        llm = get_llm_service()
+        tts = get_tts_service()
+        chat = get_chat_service()
+    except HTTPException as e:
+        await websocket.close(code=1011, reason=e.detail)
+        return
+    
+    try:
+        # Receive initial message with user input and session ID
+        message = await websocket.receive_text()
+        data = json.loads(message)
+        
+        user_input = data.get("text", "")
+        session_id = data.get("session_id", str(uuid.uuid4()))
+        voice_id = data.get("voice_id", "en-US-natalie")
+        
+        if not user_input:
+            raise WebSocketException(code=1008, reason="No text provided")
+        
+        logger.info(f"LLM to Murf request: {user_input[:50]}... (session: {session_id[:8]})")
+        
+        # Get chat history for context
+        chat_history = chat.get_chat_history(session_id, limit=10)
+        
+        # Generate LLM response
+        llm_response = ""
+        full_response = ""
+        
+        # Stream the LLM response
+        async for chunk in llm.stream_response(user_input, chat_history):
+            llm_response += chunk
+            full_response += chunk
+            
+            # Send text chunks to client as they come in
+            await websocket.send_text(json.dumps({
+                "type": "llm_chunk",
+                "text": chunk,
+                "is_complete": False
+            }))
+        
+        # Add to chat history
+        chat.add_message(session_id, "user", user_input)
+        chat.add_message(session_id, "assistant", full_response)
+        
+        # Send LLM response complete message
+        await websocket.send_text(json.dumps({
+            "type": "llm_complete",
+            "text": full_response
+        }))
+        
+        # Stream TTS response
+        logger.info(f"Streaming TTS for response (length: {len(full_response)} chars)")
+        
+        # Stream TTS chunks to client
+        async for tts_chunk in tts.stream_text_to_speech(
+            text=full_response,
+            voice_id=voice_id
+        ):
+            # Send TTS data to client
+            await websocket.send_text(json.dumps({
+                "type": "tts_chunk",
+                "data": tts_chunk,
+                "is_final": tts_chunk.get("final", False)
+            }))
+            
+            # Print base64 audio to console (as per requirements)
+            if "audio" in tts_chunk:
+                print("\n" + "="*80)
+                print("MURF TTS BASE64 AUDIO (first 100 chars):")
+                print(tts_chunk["audio"][:100] + "...")
+                print("="*80 + "\n")
+        
+        logger.info("LLM to Murf streaming completed successfully")
+        
+    except WebSocketDisconnect:
+        logger.info("LLM to Murf WebSocket client disconnected")
+    except json.JSONDecodeError:
+        await websocket.close(code=1003, reason="Invalid JSON")
+    except Exception as e:
+        logger.error(f"LLM to Murf WebSocket error: {str(e)}")
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "message": str(e)
+            }))
+        except:
+            pass
+        await websocket.close(code=1011, reason=str(e))
 
 
 @app.websocket("/ws/transcribe-stream")
