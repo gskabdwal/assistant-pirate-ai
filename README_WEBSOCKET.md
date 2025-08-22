@@ -1,12 +1,134 @@
-# WebSocket Implementation - Days 20-15
+# WebSocket Implementation - Days 21-15
 
 ## Table of Contents
+- [Day 21 - Base64 Audio Streaming to Client](#day-21---base64-audio-streaming-to-client)
 - [Day 20 - Murf WebSocket TTS Streaming](#day-20---murf-websocket-tts-streaming)
 - [Day 19 - Streaming LLM Responses](#day-19---streaming-llm-responses)
 - [Day 18 - Enhanced WebSocket State Management](#day-18---enhanced-websocket-state-management)
 - [Day 17 - Real-time Speech Transcription](#day-17---real-time-speech-transcription)
 - [Day 16 - WebSocket Audio Streaming](#day-16---websocket-audio-streaming)
 - [Day 15 - Basic WebSocket Implementation](#day-15---basic-websocket-implementation)
+
+---
+
+## Day 21 - Base64 Audio Streaming to Client
+
+### Overview
+Implemented direct streaming of base64 audio chunks to the client for accumulation without audio element playback. This provides raw base64 audio data streaming with console acknowledgement logging for each received chunk.
+
+### WebSocket Endpoint
+- **URL**: `ws://localhost:8000/ws/audio-stream-base64`
+- **Protocol**: WebSocket (JSON messages)
+- **LLM Service**: Google Gemini 1.5 Flash for text processing
+- **TTS Service**: Murf WebSocket API for base64 audio generation
+- **Audio Format**: Base64 encoded audio chunks (no playback)
+
+### Implementation Details
+
+#### Backend
+- **Streaming Pipeline**: Text input → LLM processing → Murf TTS base64 streaming
+- **WebSocket Handler**: Manages LLM response generation and TTS audio chunk streaming
+- **Message Types**: Handles `llm_response`, `audio_chunk`, `complete`, and `error` messages
+- **Chunk Indexing**: Each audio chunk includes index for tracking and logging
+- **Error Handling**: Comprehensive error handling with traceback logging for debugging
+- **Unicode Fix**: Removed emoji characters from logging to prevent Windows encoding errors
+
+#### Frontend
+- **WebSocket Client**: Connects to `/ws/audio-stream-base64` endpoint
+- **Base64 Accumulation**: Accumulates chunks in `base64AudioChunks` array
+- **Console Acknowledgement**: Logs "Audio data acknowledgement - Chunk X received by client"
+- **Real-time Statistics**: Displays chunk count and total base64 characters received
+- **No Audio Playback**: Base64 chunks streamed directly without audio element
+- **UI Components**: Orange-themed section with text input and chunk statistics
+
+### Message Protocol
+
+#### Input Message Format
+```json
+{
+  "text": "Text to convert to speech",
+  "session_id": "unique_session_identifier",
+  "voice_id": "en-US-natalie"
+}
+```
+
+#### Output Message Types
+
+**LLM Response Message:**
+```json
+{
+  "type": "llm_response",
+  "response": "Complete LLM generated response text"
+}
+```
+
+**Audio Chunk Message:**
+```json
+{
+  "type": "audio_chunk",
+  "data": "base64_encoded_audio_chunk",
+  "is_final": false,
+  "chunk_index": 1
+}
+```
+
+**Complete Message:**
+```json
+{
+  "type": "complete",
+  "message": "Base64 audio streaming completed"
+}
+```
+
+**Error Message:**
+```json
+{
+  "type": "error",
+  "message": "Error description",
+  "traceback": "Detailed error traceback for debugging"
+}
+```
+
+### Key Features
+- **Direct Base64 Streaming**: Audio chunks streamed directly to client without playback
+- **Client-Side Accumulation**: Base64 chunks accumulated in array for processing
+- **Console Acknowledgement**: Each chunk logged with acknowledgement message
+- **Real-time Statistics**: Live display of chunk count and total characters
+- **Text Input Interface**: Simple textarea for entering text to convert to speech
+- **Error Recovery**: Comprehensive error handling with detailed logging
+- **Windows Compatibility**: Fixed Unicode encoding issues for Windows console
+
+### Pipeline Flow
+1. **Text Input** → User enters text in textarea interface
+2. **WebSocket Connection** → Client connects to `/ws/audio-stream-base64`
+3. **LLM Processing** → Google Gemini generates response from input text
+4. **TTS Streaming** → Murf WebSocket API converts text to base64 audio chunks
+5. **Client Reception** → Base64 chunks accumulated in array with console logging
+6. **Statistics Display** → Real-time update of chunk count and total characters
+
+### Testing
+
+#### Frontend Testing
+1. Start the server: `python main.py`
+2. Open http://localhost:8000
+3. Scroll to "Base64 Audio Streaming (Day 21)" section
+4. Enter text in the textarea
+5. Click "Start Base64 Streaming"
+6. Watch console for acknowledgement messages
+7. Observe real-time chunk statistics in UI
+
+#### Expected Console Output
+```
+Audio data acknowledgement - Chunk 1 received by client
+Audio data acknowledgement - Chunk 2 received by client
+Audio data acknowledgement - Chunk 3 received by client
+...
+```
+
+#### Expected UI Display
+- Status: "Streaming base64 audio chunks..."
+- Base64 Chunks: "Received 5 chunks (12,345 characters total)"
+- Real-time updates as chunks arrive
 
 ---
 
@@ -399,19 +521,25 @@ The WebSocket implementation has evolved through multiple days:
 - **Day 18**: Enhanced state management and error recovery
 - **Day 19**: Streaming LLM responses with Google Gemini integration
 - **Day 20**: Murf WebSocket TTS streaming with base64 audio output
+- **Day 21**: Base64 audio streaming directly to client with accumulation
 
 ### Current WebSocket Endpoints
 
-1. **`/ws/llm-to-murf`** - LLM streaming to Murf WebSocket TTS (Day 20)
-2. **`/ws/llm-stream`** - Streaming LLM responses (Day 19)
-3. **`/ws/transcribe-stream`** - Real-time transcription (Day 17)
-4. **`/ws/audio-stream`** - Audio streaming (Day 16)
-5. **`/ws`** - Basic echo server (Day 15)
+1. **`/ws/audio-stream-base64`** - Base64 audio streaming to client (Day 21)
+2. **`/ws/llm-to-murf`** - LLM streaming to Murf WebSocket TTS (Day 20)
+3. **`/ws/llm-stream`** - Streaming LLM responses (Day 19)
+4. **`/ws/transcribe-stream`** - Real-time transcription (Day 17)
+5. **`/ws/audio-stream`** - Audio streaming (Day 16)
+6. **`/ws`** - Basic echo server (Day 15)
 
 ### Complete Pipeline Integration
+
+The Day 21 implementation provides direct base64 audio streaming to client:
+
+**Text Input** → **LLM Processing** → **Streaming TTS** → **Base64 Audio Chunks** → **Client Accumulation**
 
 The Day 20 implementation provides the most advanced real-time voice agent pipeline:
 
 **Audio Recording** → **Speech-to-Text** → **Streaming LLM** → **Streaming TTS** → **Base64 Audio Output**
 
-All components work together seamlessly through WebSocket connections with real-time LLM-to-TTS streaming for optimal performance and immediate audio generation.
+All components work together seamlessly through WebSocket connections with real-time streaming for optimal performance and immediate audio generation.

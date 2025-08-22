@@ -186,13 +186,13 @@ class TTSService:
         ws_url = "wss://api.murf.ai/v1/speech/stream-input"
         
         try:
-            logger.info(f"🎵 Starting Murf WebSocket TTS streaming for text: {text[:50]}...")
+            logger.info(f"Starting Murf WebSocket TTS streaming for text: {text[:50]}...")
             
             # Connect to Murf WebSocket
             async with websockets.connect(
                 f"{ws_url}?api-key={self.api_key}&sample_rate={sample_rate}&channel_type={channel_type}&format={format}"
             ) as websocket:
-                logger.info("🔗 Connected to Murf WebSocket")
+                logger.info("Connected to Murf WebSocket")
                 
                 # Send voice configuration with static context_id
                 voice_config = {
@@ -206,7 +206,7 @@ class TTSService:
                     }
                 }
                 
-                logger.info(f"📤 Sending voice config: {voice_config}")
+                logger.info(f"Sending voice config: {voice_config}")
                 await websocket.send(json.dumps(voice_config))
                 
                 # Send text message
@@ -216,7 +216,7 @@ class TTSService:
                     "end": False  # Don't close context immediately to allow streaming
                 }
                 
-                logger.info(f"📤 Sending text message: {text_msg}")
+                logger.info(f"Sending text message: {text_msg}")
                 await websocket.send(json.dumps(text_msg))
                 
                 # Process responses
@@ -226,13 +226,13 @@ class TTSService:
                     data = json.loads(response)
                     
                     chunk_count += 1
-                    logger.info(f"📥 Received chunk {chunk_count}: {data}")
+                    logger.info(f"Received chunk {chunk_count}: {data}")
                     
                     # Enhanced base64 audio logging for LinkedIn screenshot
                     if "audio" in data:
                         audio_b64 = data["audio"]
                         print("\n" + "="*80)
-                        print(f"🎵 MURF WEBSOCKET BASE64 AUDIO CHUNK {chunk_count}")
+                        print(f"MURF WEBSOCKET BASE64 AUDIO CHUNK {chunk_count}")
                         print("="*80)
                         print(f"Audio length: {len(audio_b64)} characters")
                         print(f"First 200 chars: {audio_b64[:200]}")
@@ -240,17 +240,17 @@ class TTSService:
                         print("="*80 + "\n")
                         
                         # Also log to logger for persistent record
-                        logger.info(f"🎵 Base64 audio chunk {chunk_count}: {len(audio_b64)} chars")
+                        logger.info(f"Base64 audio chunk {chunk_count}: {len(audio_b64)} chars")
                     
                     yield data
                     
                     # Check if this is the final message
                     if data.get("final"):
-                        logger.info("✅ Murf WebSocket streaming completed")
+                        logger.info("Murf WebSocket streaming completed")
                         break
                         
         except Exception as e:
-            logger.error(f"❌ WebSocket TTS streaming error: {str(e)}")
+            logger.error(f"WebSocket TTS streaming error: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"WebSocket TTS streaming error: {str(e)}"

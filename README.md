@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 20, we've implemented Murf WebSocket streaming for real-time TTS generation. The latest updates include streaming LLM responses that are sent directly to Murf's WebSocket API for immediate audio generation with base64 audio output.
+This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 21, we've implemented base64 audio streaming directly to the client for accumulation without audio element playback. The latest updates include streaming base64 audio chunks with console acknowledgement logging and real-time statistics display.
 
 ### Project Structure
 
@@ -167,6 +167,7 @@ UklGRjQAAABXQVZFZm10IBAAAAABAAEAK...
 
 #### WebSocket Endpoints
 
+- **`/ws/audio-stream-base64`**: Base64 audio streaming to client (Day 21)
 - **`/ws/llm-to-murf`**: LLM streaming to Murf WebSocket TTS (Day 20)
 - **`/ws/llm-stream`**: Streaming LLM responses (Day 19)
 - **`/ws/audio-stream`**: Real-time audio streaming (Day 16)
@@ -218,6 +219,40 @@ streamed_audio_{unique_session_id}_{timestamp}.wav
 Example: `streamed_audio_7d47a72f-8dc0-4163-a21a-914fb6e3de15_1755437664.wav`
 
 ### Features
+
+#### Day 21 - Streaming Base64 Audio Data to Client 🎵
+
+**Direct Base64 Audio Streaming:**
+- **WebSocket Endpoint**: New `/ws/audio-stream-base64` endpoint for streaming base64 audio chunks directly to client
+- **Client-Side Accumulation**: Base64 audio chunks accumulated in array without audio element playback
+- **Console Acknowledgement**: Client prints "Audio data acknowledgement - Chunk X received by client" for each chunk
+- **Real-time Statistics**: Live display of chunk count and total base64 characters received
+- **Text-to-Speech Pipeline**: Text input → LLM processing → Base64 audio chunk streaming
+- **No Audio Playback**: Base64 chunks streamed directly without playing in audio element
+
+**Technical Implementation:**
+- **Frontend**: WebSocket client accumulates base64 chunks in `base64AudioChunks` array
+- **Backend**: Streams LLM-generated text followed by Murf TTS base64 audio chunks
+- **UI Components**: Orange-themed section with text input, status display, and chunk statistics
+- **Console Logging**: Each received chunk logged with acknowledgement message
+- **Error Handling**: Comprehensive error handling with traceback logging for debugging
+- **Unicode Fix**: Removed emoji characters from logging to prevent Windows encoding errors
+
+**Key Features:**
+- Direct streaming of base64 audio data to client without playback
+- Real-time chunk accumulation and statistics display
+- Console acknowledgement logging for each received audio chunk
+- Integration with existing LLM and TTS services
+- Text input interface for generating speech content
+- Live feedback on streaming progress and chunk reception
+
+**Pipeline Flow:**
+1. **Text Input** → User enters text in textarea
+2. **WebSocket Connection** → Client connects to `/ws/audio-stream-base64`
+3. **LLM Processing** → Google Gemini generates response from input text
+4. **TTS Streaming** → Murf WebSocket API converts text to base64 audio chunks
+5. **Client Reception** → Base64 chunks accumulated in array with console logging
+6. **Statistics Display** → Real-time update of chunk count and total characters
 
 #### Day 20 - Murf WebSocket TTS Streaming 🎵
 

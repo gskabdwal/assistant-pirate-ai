@@ -20,7 +20,7 @@
     </nav>
     
     <div class="container">
-        <!-- Day 17: Real-time Transcription -->
+        <!-- Day 17: Real-time Transcription
         <div class="streaming-transcription-container">
             <h2>🎙️ Real-time Transcription (Day 18)</h2>
             <div id="streamStatus" class="status-message">Press "Start Streaming" to begin real-time transcription</div>
@@ -36,7 +36,7 @@
         </div>
         
         <!-- AI Voice Agent with Streaming -->
-        <div class="llm-voice-container">
+        <!-- <div class="llm-voice-container">
             <h2>AI Voice Agent with Streaming (Day 19)</h2>
             <div id="llmStatus" class="status-message">Press "Start Recording" to ask the AI a question</div>
             <div class="recording-controls">
@@ -70,6 +70,23 @@
         <div class="chat-history-container">
             <h3>Chat History</h3>
             <div id="llmChatHistory" class="chat-history"></div>
+        </div> --> -->
+        
+        <!-- Day 21: Base64 Audio Streaming -->
+        <div class="base64-audio-container">
+            <h2>🎵 Base64 Audio Streaming (Day 21)</h2>
+            <div id="base64Status" class="status-message">Enter text to stream as base64 audio chunks</div>
+            <div class="input-controls">
+                <label for="base64Input">Text to convert to speech:</label>
+                <textarea id="base64Input" class="text-input" rows="3" placeholder="Enter text here to convert to streaming base64 audio...">Hello! This is a test of Day 21 base64 audio streaming functionality. The audio will be streamed as base64 chunks directly to the client without playing in an audio element.</textarea>
+            </div>
+            <div class="recording-controls">
+                <button id="startBase64Stream" class="control-btn">Start Base64 Streaming</button>
+            </div>
+            <div class="base64-display">
+                <h3>Base64 Audio Chunks</h3>
+                <div id="base64AudioChunks" class="base64-chunks-display">No audio chunks received yet...</div>
+            </div>
         </div>
     </div>
     

@@ -14,6 +14,11 @@ let transcribeWebSocket;
 let streamMediaRecorder;
 let isTranscribing = false;
 
+// Day 21: Base64 audio streaming variables
+let base64AudioWebSocket;
+let base64AudioChunks = [];
+let isBase64Streaming = false;
+
 // DOM Elements
 let startLLMRecordingBtn;
 let stopLLMRecordingBtn;
@@ -32,6 +37,13 @@ let stopStreamRecordingBtn;
 let streamStatus;
 let partialTranscript;
 let finalTranscript;
+
+// Day 21: Base64 audio streaming DOM elements
+let startBase64StreamBtn;
+let stopBase64StreamBtn;
+let base64Status;
+let base64Input;
+let base64AudioChunksDisplay;
 
 // Session management functions
 function getOrCreateSessionId() {
@@ -493,6 +505,176 @@ function stopStreamRecording() {
     isTranscribing = false;
 }
 
+// Day 21: Connect to Base64 Audio Streaming WebSocket
+function connectBase64AudioWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/audio-stream-base64`;
+    
+    base64AudioWebSocket = new WebSocket(wsUrl);
+    
+    base64AudioWebSocket.onopen = () => {
+        console.log('🎵 Day 21: Base64 Audio WebSocket connected');
+        isBase64Streaming = true;
+        if (base64Status) {
+            base64Status.textContent = 'Connected - Ready to stream base64 audio';
+        }
+    };
+    
+    base64AudioWebSocket.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            console.log('🎵 Day 21: Base64 Audio WebSocket message:', data.type);
+            
+            if (data.type === 'ready') {
+                console.log('✅ Day 21: Base64 audio streaming ready');
+                if (base64Status) {
+                    base64Status.textContent = 'Ready to stream base64 audio';
+                }
+            }
+            else if (data.type === 'llm_chunk') {
+                // Display LLM response chunks
+                console.log('📝 Day 21: LLM chunk received:', data.text);
+                const streamingText = document.getElementById('llmStreamingText');
+                if (streamingText) {
+                    streamingText.textContent += data.text || '';
+                    streamingText.scrollTop = streamingText.scrollHeight;
+                }
+            }
+            else if (data.type === 'llm_complete') {
+                console.log('✅ Day 21: LLM response complete');
+                const responseText = document.getElementById('llmResponseText');
+                if (responseText) {
+                    responseText.textContent = data.text;
+                    responseText.scrollTop = responseText.scrollHeight;
+                }
+                if (base64Status) {
+                    base64Status.textContent = 'LLM response complete - Starting audio streaming...';
+                }
+            }
+            else if (data.type === 'audio_stream_start') {
+                console.log('🎵 Day 21: Base64 audio streaming started');
+                if (base64Status) {
+                    base64Status.textContent = 'Streaming base64 audio chunks...';
+                }
+                // Clear previous audio chunks
+                base64AudioChunks = [];
+                if (base64AudioChunksDisplay) {
+                    base64AudioChunksDisplay.textContent = 'Receiving audio chunks...';
+                }
+            }
+            else if (data.type === 'audio_chunk') {
+                // Day 21: Accumulate base64 audio chunks
+                console.log(`🎵 Day 21: Audio chunk ${data.chunk_index} received (${data.data.length} chars)`);
+                console.log(`📡 Day 21: Audio data acknowledgement - Chunk ${data.chunk_index} received by client`);
+                
+                base64AudioChunks.push({
+                    data: data.data,
+                    chunk_index: data.chunk_index,
+                    is_final: data.is_final
+                });
+                
+                // Update display with chunk count
+                if (base64AudioChunksDisplay) {
+                    base64AudioChunksDisplay.textContent = `Received ${base64AudioChunks.length} audio chunks (${base64AudioChunks.reduce((total, chunk) => total + chunk.data.length, 0)} total chars)`;
+                }
+                
+                // Log acknowledgement to console as required
+                console.log(`✅ Day 21: Audio chunk ${data.chunk_index} acknowledged by client - Total chunks: ${base64AudioChunks.length}`);
+            }
+            else if (data.type === 'audio_stream_complete') {
+                console.log('🎵 Day 21: Base64 audio streaming completed');
+                console.log(`📊 Day 21: Final stats - Total chunks received: ${base64AudioChunks.length}`);
+                
+                if (base64Status) {
+                    base64Status.textContent = `Audio streaming complete - ${base64AudioChunks.length} chunks received`;
+                }
+                
+                if (base64AudioChunksDisplay) {
+                    const totalChars = base64AudioChunks.reduce((total, chunk) => total + chunk.data.length, 0);
+                    base64AudioChunksDisplay.textContent = `Complete! ${base64AudioChunks.length} chunks, ${totalChars} total base64 characters`;
+                }
+                
+                // Log final acknowledgement
+                console.log(`✅ Day 21: All audio chunks received and acknowledged by client`);
+            }
+            else if (data.type === 'audio_stream_error') {
+                console.error('❌ Day 21: Base64 audio streaming error:', data.message);
+                if (base64Status) {
+                    base64Status.textContent = `Audio streaming error: ${data.message}`;
+                }
+            }
+            else if (data.type === 'error') {
+                console.error('❌ Day 21: Base64 Audio WebSocket error:', data.message);
+                if (base64Status) {
+                    base64Status.textContent = `Error: ${data.message}`;
+                }
+            }
+        } catch (error) {
+            console.error('Day 21: Error processing Base64 Audio WebSocket message:', error);
+        }
+    };
+    
+    base64AudioWebSocket.onclose = () => {
+        console.log('🎵 Day 21: Base64 Audio WebSocket disconnected');
+        isBase64Streaming = false;
+        if (base64Status) {
+            base64Status.textContent = 'Disconnected';
+        }
+    };
+    
+    base64AudioWebSocket.onerror = (error) => {
+        console.error('🎵 Day 21: Base64 Audio WebSocket error:', error);
+        isBase64Streaming = false;
+        if (base64Status) {
+            base64Status.textContent = 'Connection error';
+        }
+    };
+}
+
+// Day 21: Start Base64 Audio Streaming
+function startBase64AudioStreaming() {
+    const textInput = base64Input ? base64Input.value.trim() : '';
+    if (!textInput) {
+        alert('Please enter some text to convert to speech');
+        return;
+    }
+    
+    if (!base64AudioWebSocket || base64AudioWebSocket.readyState !== WebSocket.OPEN) {
+        console.log('🎵 Day 21: WebSocket not connected, connecting...');
+        connectBase64AudioWebSocket();
+        
+        // Wait for connection and then send
+        setTimeout(() => {
+            if (base64AudioWebSocket && base64AudioWebSocket.readyState === WebSocket.OPEN) {
+                sendBase64StreamingRequest(textInput);
+            } else {
+                if (base64Status) {
+                    base64Status.textContent = 'Failed to connect to server';
+                }
+            }
+        }, 1000);
+    } else {
+        sendBase64StreamingRequest(textInput);
+    }
+}
+
+// Day 21: Send streaming request
+function sendBase64StreamingRequest(text) {
+    const voiceId = llmVoiceSelect ? llmVoiceSelect.value : 'en-US-natalie';
+    
+    console.log(`🎵 Day 21: Sending base64 streaming request for text: "${text.substring(0, 50)}..."`);
+    
+    base64AudioWebSocket.send(JSON.stringify({
+        text: text,
+        session_id: sessionId || 'default-session',
+        voice_id: voiceId
+    }));
+    
+    if (base64Status) {
+        base64Status.textContent = 'Processing text and generating audio...';
+    }
+}
+
 // Connect to LLM WebSocket
 function connectLLMWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -898,6 +1080,13 @@ function initApp() {
         partialTranscript = document.getElementById('partialTranscript');
         finalTranscript = document.getElementById('finalTranscript');
         
+        // Day 21: Initialize base64 audio streaming DOM elements
+        startBase64StreamBtn = document.getElementById('startBase64Stream');
+        stopBase64StreamBtn = document.getElementById('stopBase64Stream');
+        base64Status = document.getElementById('base64Status');
+        base64Input = document.getElementById('base64Input');
+        base64AudioChunksDisplay = document.getElementById('base64AudioChunks');
+        
         // Log element initialization
         console.log('Elements initialized:', {
             startLLMRecordingBtn: !!startLLMRecordingBtn,
@@ -925,6 +1114,7 @@ function initApp() {
             connectAudioWebSocket();
             connectTranscribeWebSocket();
             connectLLMWebSocket();
+            connectBase64AudioWebSocket(); // Day 21: Initialize base64 audio WebSocket
         }, 500);
         
         console.log('Application initialization complete');
@@ -987,6 +1177,20 @@ function setupEventListeners() {
                 console.error('Error in stopStreamRecording:', error);
                 if (streamStatus) {
                     streamStatus.textContent = `Error: ${error.message}`;
+                }
+            }
+        });
+    }
+    
+    // Day 21: Base64 audio streaming event listeners
+    if (startBase64StreamBtn) {
+        startBase64StreamBtn.addEventListener('click', () => {
+            try {
+                startBase64AudioStreaming();
+            } catch (error) {
+                console.error('Error in startBase64AudioStreaming:', error);
+                if (base64Status) {
+                    base64Status.textContent = `Error: ${error.message}`;
                 }
             }
         });

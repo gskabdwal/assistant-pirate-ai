@@ -750,6 +750,107 @@ audio:focus {
     margin-top: 8px;
 }
 
+/* Day 21: Base64 Audio Streaming Styles */
+.base64-audio-container {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 2rem 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 2px solid #FF6B35;
+}
+
+.base64-audio-container h2 {
+    color: #10162F;
+    margin-bottom: 20px;
+    font-size: 24px;
+    font-weight: 700;
+    position: relative;
+}
+
+.base64-audio-container h2:after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 0;
+    width: 40px;
+    height: 4px;
+    background-color: #FF6B35;
+}
+
+.input-controls {
+    margin: 20px 0;
+}
+
+.input-controls label {
+    display: block;
+    font-weight: 600;
+    color: #10162F;
+    margin-bottom: 8px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.text-input {
+    width: 100%;
+    padding: 16px;
+    border-radius: 6px;
+    border: 2px solid #DFE1E5;
+    font-family: inherit;
+    font-size: 16px;
+    resize: vertical;
+    transition: border-color 0.2s ease;
+    background-color: white;
+}
+
+.text-input:focus {
+    outline: none;
+    border-color: #FF6B35;
+    box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.2);
+}
+
+.base64-display {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #F8FAFF;
+    border-radius: 8px;
+    border: 1px solid #E1E5EE;
+}
+
+.base64-display h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #10162F;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.base64-chunks-display {
+    background-color: #f8f9fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    padding: 15px;
+    min-height: 80px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #333;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+#startBase64Stream {
+    background-color: #FF6B35;
+    color: white;
+}
+
+#startBase64Stream:hover {
+    background-color: #E55A2B;
+}
+
 footer {
     text-align: center;
     margin-top: 30px;
