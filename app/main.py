@@ -700,11 +700,11 @@ async def llm_to_murf_websocket(websocket: WebSocket):
 @app.websocket("/ws/audio-stream-base64")
 async def audio_stream_base64_websocket(websocket: WebSocket):
     """
-    Day 21: WebSocket endpoint for streaming base64 audio data to client.
-    Streams base64 audio chunks directly to the client without playing in audio element.
+    Day 22: WebSocket endpoint for streaming base64 audio data with seamless playback.
+    Enhanced to handle client disconnections and reconnections properly.
     """
     await websocket.accept()
-    logger.info(f"Day 21: Base64 audio stream WebSocket connection established from {websocket.client}")
+    logger.info(f"Day 22: Streaming audio WebSocket connection established from {websocket.client}")
     
     # Get dependencies
     try:
@@ -719,103 +719,136 @@ async def audio_stream_base64_websocket(websocket: WebSocket):
         # Send ready message
         await websocket.send_text(json.dumps({
             "type": "ready",
-            "message": "Ready to stream base64 audio data"
+            "message": "Ready to stream and play audio"
         }))
         
         while True:
-            message = await websocket.receive()
-            
-            if message["type"] == "websocket.receive":
-                if "text" in message:
-                    data = json.loads(message["text"])
-                    user_input = data.get("text", "")
-                    session_id = data.get("session_id", str(uuid.uuid4()))
-                    voice_id = data.get("voice_id", "en-US-natalie")
+            try:
+                message = await websocket.receive()
+                
+                if message["type"] == "websocket.disconnect":
+                    logger.info("Day 22: Client requested disconnect")
+                    break
                     
-                    if not user_input:
-                        await websocket.send_text(json.dumps({
-                            "type": "error",
-                            "message": "No text provided in request"
-                        }))
-                        continue
-                    
-                    logger.info(f"🎵 Day 21: Starting base64 audio streaming for: {user_input[:50]}...")
-                    
-                    # Get chat history for context
-                    chat_history = chat.get_chat_history(session_id, limit=10)
-                    
-                    # Generate LLM response
-                    llm_response = ""
-                    async for chunk in llm.stream_response(user_input, chat_history):
-                        llm_response += chunk
+                if message["type"] == "websocket.receive":
+                    if "text" in message:
+                        data = json.loads(message["text"])
+                        user_input = data.get("text", "")
+                        session_id = data.get("session_id", str(uuid.uuid4()))
+                        voice_id = data.get("voice_id", "en-US-natalie")
                         
-                        # Send text chunks to client
-                        await websocket.send_text(json.dumps({
-                            "type": "llm_chunk",
-                            "text": chunk,
-                            "is_complete": False
-                        }))
-                    
-                    # Update chat history
-                    chat.add_message(session_id, "user", user_input)
-                    chat.add_message(session_id, "assistant", llm_response)
-                    
-                    # Send LLM response complete
-                    await websocket.send_text(json.dumps({
-                        "type": "llm_complete",
-                        "text": llm_response
-                    }))
-                    
-                    # Day 21: Stream base64 audio chunks to client
-                    if llm_response.strip():
-                        logger.info(f"🎵 Day 21: Streaming base64 audio chunks for response: {len(llm_response)} chars")
+                        logger.info(f"Day 22: Processing request - Text: {user_input[:50]}..., Session: {session_id[:8]}")
                         
+                        if not user_input:
+                            await websocket.send_text(json.dumps({
+                                "type": "error",
+                                "message": "No text provided in request"
+                            }))
+                            continue
+                        
+                        logger.info(f"🎵 Day 22: Starting streaming audio playback for: {user_input[:50]}...")
+                        
+                        # Get chat history for context
+                        chat_history = chat.get_chat_history(session_id, limit=10)
+                        
+                        # Generate LLM response
+                        llm_response = ""
+                        async for chunk in llm.stream_response(user_input, chat_history):
+                            llm_response += chunk
+                            
+                            # Send text chunks to client
+                            await websocket.send_text(json.dumps({
+                                "type": "llm_chunk",
+                                "text": chunk,
+                                "is_complete": False
+                            }))
+                        
+                        # Update chat history
+                        chat.add_message(session_id, "user", user_input)
+                        chat.add_message(session_id, "assistant", llm_response)
+                        
+                        # Send LLM response complete
                         await websocket.send_text(json.dumps({
-                            "type": "audio_stream_start",
-                            "message": "Starting base64 audio streaming"
+                            "type": "llm_complete",
+                            "text": llm_response
                         }))
                         
-                        try:
-                            # Stream TTS base64 chunks directly to client
-                            chunk_index = 0
-                            async for tts_chunk in tts.stream_text_to_speech(
-                                text=llm_response,
-                                voice_id=voice_id
-                            ):
-                                # Send base64 audio chunk to client
-                                if "audio" in tts_chunk:
-                                    chunk_index += 1
-                                    await websocket.send_text(json.dumps({
-                                        "type": "audio_chunk",
-                                        "data": tts_chunk["audio"],  # Base64 audio data
-                                        "is_final": tts_chunk.get("final", False),
-                                        "chunk_index": chunk_index
-                                    }))
-                                    
-                                    # Log base64 audio chunk received by server
-                                    logger.info(f"📡 Day 21: Sent base64 audio chunk {chunk_index} to client ({len(tts_chunk['audio'])} chars)")
+                        # Day 22: Stream base64 audio chunks for seamless playback
+                        if llm_response.strip():
+                            logger.info(f"🎵 Day 22: Streaming audio for seamless playback: {len(llm_response)} chars")
                             
                             await websocket.send_text(json.dumps({
-                                "type": "audio_stream_complete",
-                                "message": "Base64 audio streaming completed"
+                                "type": "audio_stream_start",
+                                "message": "Starting streaming audio playback"
                             }))
                             
-                        except Exception as tts_error:
-                            import traceback
-                            error_details = traceback.format_exc()
-                            logger.error(f"❌ Day 21: Base64 audio streaming error: {str(tts_error)}")
-                            logger.error(f"❌ Day 21: Error traceback: {error_details}")
-                            await websocket.send_text(json.dumps({
-                                "type": "audio_stream_error",
-                                "message": f"Audio streaming failed: {str(tts_error)}"
-                            }))
-                    
+                            try:
+                                # Stream TTS base64 chunks for real-time playback
+                                chunk_index = 0
+                                final_chunk_sent = False
+                                
+                                async for tts_chunk in tts.stream_text_to_speech(
+                                    text=llm_response,
+                                    voice_id=voice_id
+                                ):
+                                    # Send base64 audio chunk for immediate playback
+                                    if "audio" in tts_chunk:
+                                        chunk_index += 1
+                                        is_final = tts_chunk.get("final", False)
+                                        
+                                        await websocket.send_text(json.dumps({
+                                            "type": "audio_chunk",
+                                            "data": tts_chunk["audio"],  # Base64 audio data
+                                            "is_final": is_final,
+                                            "chunk_index": chunk_index
+                                        }))
+                                        
+                                        # Log streaming audio chunk
+                                        logger.info(f"🎵 Day 22: Sent streaming audio chunk {chunk_index} for playback ({len(tts_chunk['audio'])} chars) - Final: {is_final}")
+                                        
+                                        if is_final:
+                                            final_chunk_sent = True
+                                            logger.info(f"🎵 Day 22: Final chunk {chunk_index} sent, streaming will complete")
+                                
+                                # Always send completion message after the streaming loop ends
+                                logger.info(f"🎵 Day 22: TTS streaming loop completed, sending completion message (final_chunk_sent: {final_chunk_sent})")
+                                await websocket.send_text(json.dumps({
+                                    "type": "audio_stream_complete",
+                                    "message": f"Streaming audio playback completed - {chunk_index} chunks sent"
+                                }))
+                                
+                            except Exception as tts_error:
+                                import traceback
+                                error_details = traceback.format_exc()
+                                logger.error(f"❌ Day 22: Streaming audio error: {str(tts_error)}")
+                                logger.error(f"❌ Day 22: Error traceback: {error_details}")
+                                error_detail = str(tts_error) if str(tts_error) else "TTS streaming connection terminated unexpectedly"
+                                logger.error(f"TTS streaming failed with error: {error_detail}")
+                                await websocket.send_text(json.dumps({
+                                    "type": "audio_stream_error",
+                                    "message": f"Streaming audio failed: {error_detail}"
+                                }))
+                            
+            except WebSocketDisconnect:
+                logger.info("Day 22: Client disconnected during message processing")
+                break
+            except json.JSONDecodeError as e:
+                logger.error(f"Day 22: Invalid JSON received: {str(e)}")
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "message": "Invalid JSON format"
+                }))
+            except Exception as e:
+                logger.error(f"Day 22: Error processing message: {str(e)}")
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "message": f"Processing error: {str(e)}"
+                }))
+                        
     except WebSocketDisconnect:
-        logger.info(f"Day 21: Base64 audio stream WebSocket client disconnected: {websocket.client}")
-    except json.JSONDecodeError:
-        await websocket.close(code=1003, reason="Invalid JSON")
+        logger.info(f"Day 22: Streaming audio WebSocket client disconnected: {websocket.client}")
     except Exception as e:
-        logger.error(f"Day 21: Base64 audio stream WebSocket error: {str(e)}")
+        logger.error(f"Day 22: Streaming audio WebSocket error: {str(e)}")
         try:
             await websocket.send_text(json.dumps({
                 "type": "error",
@@ -823,7 +856,12 @@ async def audio_stream_base64_websocket(websocket: WebSocket):
             }))
         except:
             pass
-        await websocket.close(code=1011, reason=str(e))
+    finally:
+        logger.info(f"Day 22: Streaming audio WebSocket connection closed for {websocket.client}")
+        try:
+            await websocket.close()
+        except:
+            pass
 
 
 @app.websocket("/ws/transcribe-stream")

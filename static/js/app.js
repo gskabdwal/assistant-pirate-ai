@@ -19,6 +19,19 @@ let base64AudioWebSocket;
 let base64AudioChunks = [];
 let isBase64Streaming = false;
 
+// Day 22: Streaming Audio Playback Variables (Murf-optimized)
+let streamingAudioWebSocket = null;
+let audioContext = null;
+let audioChunks = []; // Store raw Float32 audio chunks
+let isStreamingAudio = false;
+let playheadTime = 0;
+let totalPlaybackTime = 0;
+let chunkCount = 0;
+let isFirstChunk = true;
+let isPlaying = false;
+let wavHeaderSet = true;
+let chunksReceived = 0;
+
 // DOM Elements
 let startLLMRecordingBtn;
 let stopLLMRecordingBtn;
@@ -44,6 +57,19 @@ let stopBase64StreamBtn;
 let base64Status;
 let base64Input;
 let base64AudioChunksDisplay;
+
+// Day 22: Streaming audio playback DOM elements
+let startStreamingAudioBtn;
+let stopStreamingAudioBtn;
+let streamingAudioStatus;
+let streamingAudioInput;
+let audioPlaybackStatus;
+let chunksReceivedDisplay;
+let audioProgressDisplay;
+let playbackTimeDisplay;
+let audioCanvas;
+let audioCanvasContext;
+let visualizerBars = [];
 
 // Session management functions
 function getOrCreateSessionId() {
@@ -675,6 +701,544 @@ function sendBase64StreamingRequest(text) {
     }
 }
 
+// Day 22: Streaming Audio Playback Functions
+function connectStreamingAudioWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/audio-stream-base64`;
+    
+    streamingAudioWebSocket = new WebSocket(wsUrl);
+    
+    streamingAudioWebSocket.onopen = () => {
+        console.log('🎵 Day 22: Streaming Audio WebSocket connected');
+        if (streamingAudioStatus) {
+            streamingAudioStatus.textContent = 'Connected - Ready to stream and play audio';
+        }
+    };
+    
+    streamingAudioWebSocket.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            console.log('🎵 Day 22: Streaming Audio WebSocket message:', data.type);
+            
+            if (data.type === 'ready') {
+                console.log('✅ Day 22: Streaming audio ready');
+                if (streamingAudioStatus) {
+                    streamingAudioStatus.textContent = 'Ready to stream and play audio';
+                }
+            }
+            else if (data.type === 'llm_chunk') {
+                console.log('📝 Day 22: LLM chunk received:', data.text);
+            }
+            else if (data.type === 'llm_complete') {
+                console.log('✅ Day 22: LLM response complete');
+                if (streamingAudioStatus) {
+                    streamingAudioStatus.textContent = 'LLM response complete - Starting audio streaming...';
+                }
+            }
+            else if (data.type === 'audio_stream_start') {
+                console.log('🎵 Day 22: Audio streaming started');
+                try {
+                    // Always initialize fresh audio context for each session
+                    initializeAudioPlayback();
+                    if (streamingAudioStatus) {
+                        streamingAudioStatus.textContent = 'Streaming and playing audio...';
+                    }
+                    console.log('🎵 Day 22: Audio context initialized successfully');
+                } catch (error) {
+                    console.error('🎵 Day 22: Error initializing audio context:', error);
+                    if (streamingAudioStatus) {
+                        streamingAudioStatus.textContent = 'Error initializing audio playback';
+                    }
+                }
+            }
+            else if (data.type === 'audio_chunk') {
+                console.log(`🎵 Day 22: Audio chunk ${data.chunk_index} received - Playing seamlessly`);
+                playAudioChunk(data.data);
+                updatePlaybackUI(data.chunk_index, data.is_final);
+            }
+            else if (data.type === 'audio_stream_complete') {
+                console.log('🎵 Day 22: Audio streaming completed');
+                if (streamingAudioStatus) {
+                    streamingAudioStatus.textContent = `Audio streaming complete - ${chunksReceived} chunks played`;
+                }
+                finishAudioPlayback();
+            }
+            else if (data.type === 'audio_stream_error') {
+                console.error('❌ Day 22: Audio streaming error:', data.message);
+                if (streamingAudioStatus) {
+                    streamingAudioStatus.textContent = `Audio streaming error: ${data.message}`;
+                }
+            }
+            else if (data.type === 'error') {
+                console.error('❌ Day 22: Streaming Audio WebSocket error:', data.message);
+                if (streamingAudioStatus) {
+                    streamingAudioStatus.textContent = `Error: ${data.message}`;
+                }
+            }
+        } catch (error) {
+            console.error('Day 22: Error processing Streaming Audio WebSocket message:', error);
+        }
+    };
+    
+    streamingAudioWebSocket.onclose = () => {
+        console.log('🎵 Day 22: Streaming Audio WebSocket disconnected');
+        isStreamingAudio = false;
+        isPlayingAudio = false;
+        
+        // Reset UI state properly on disconnect
+        if (startStreamingAudioBtn) startStreamingAudioBtn.disabled = false;
+        if (stopStreamingAudioBtn) stopStreamingAudioBtn.disabled = true;
+        
+        if (streamingAudioStatus) {
+            streamingAudioStatus.textContent = 'Ready to stream and play audio';
+        }
+        
+        if (audioPlaybackStatus) {
+            audioPlaybackStatus.textContent = 'Ready to stream audio...';
+        }
+    };
+    
+    streamingAudioWebSocket.onerror = (error) => {
+        console.error('🎵 Day 22: Streaming Audio WebSocket error:', error);
+        isStreamingAudio = false;
+        if (streamingAudioStatus) {
+            streamingAudioStatus.textContent = 'Connection error';
+        }
+    };
+}
+
+// Day 22: Initialize audio playback with enhanced error handling
+function initializeAudioPlayback() {
+    try {
+        // Close existing audio context if any
+        if (audioContext) {
+            audioContext.close();
+        }
+        
+        // Create fresh audio context
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 44100
+        });
+        
+        // Reset all playback state using Murf pattern
+        audioChunks = [];
+        playheadTime = audioContext.currentTime;
+        totalPlaybackTime = 0;
+        chunkCount = 0;
+        isPlaying = false;
+        wavHeaderSet = true; // Reset WAV header flag
+        
+        console.log('🎵 Day 22: Audio playback initialized fresh');
+        
+        // Initialize audio visualizer (placeholder for now)
+        // initializeAudioVisualizer();
+        
+        return true;
+        
+    } catch (error) {
+        console.error('Failed to initialize audio playback:', error);
+        return false;
+    }
+}
+
+// Day 22: Convert base64 to PCM Float32 (fixed for proper audio quality)
+function base64ToPCMFloat32(base64Audio) {
+    try {
+        let binary = atob(base64Audio);
+        const offset = wavHeaderSet ? 44 : 0; // Skip WAV header if present
+        if (wavHeaderSet) {
+            console.log('🎵 Day 22: Skipping WAV header for first chunk');
+            wavHeaderSet = false;
+        }
+        const length = binary.length - offset;
+
+        const buffer = new ArrayBuffer(length);
+        const byteArray = new Uint8Array(buffer);
+        for (let i = 0; i < byteArray.length; i++) {
+            byteArray[i] = binary.charCodeAt(i + offset);
+        }
+
+        const view = new DataView(byteArray.buffer);
+        const sampleCount = byteArray.length / 2;
+        const float32Array = new Float32Array(sampleCount);
+
+        for (let i = 0; i < sampleCount; i++) {
+            const int16 = view.getInt16(i * 2, true);
+            float32Array[i] = int16 / 32768;
+        }
+
+        console.log(`🎵 Day 22: Converted ${sampleCount} samples from base64`);
+        return float32Array;
+        
+    } catch (error) {
+        console.error('Error converting base64 to PCM:', error);
+        return null;
+    }
+}
+
+// Day 22: Play audio chunk seamlessly with improved buffering
+function playAudioChunk(base64Audio) {
+    try {
+        const float32Array = base64ToPCMFloat32(base64Audio);
+        if (!float32Array) {
+            return;
+        }
+
+        audioChunks.push(float32Array);
+        
+        // Start playing immediately when we have chunks and not already playing
+        if (!isPlaying && audioChunks.length >= 1) {
+            isPlaying = true;
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            chunkPlay();
+        }
+        
+        console.log(`🎵 Day 22: Audio chunk queued - ${audioChunks.length} chunks in buffer`);
+        
+        // Update audio visualizer
+        updateAudioVisualizer(float32Array);
+        
+    } catch (error) {
+        console.error('Error in playAudioChunk:', error);
+    }
+}
+
+// Day 22: Play next chunk in queue with enhanced scheduling
+function chunkPlay() {
+    if (audioChunks.length > 0) {
+        const chunk = audioChunks.shift();
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+        const buffer = audioContext.createBuffer(1, chunk.length, 44100);
+        buffer.copyToChannel(chunk, 0);
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        
+        // Add gain node for volume control
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = 0.8;
+        source.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        // Set playback rate to 80% speed (0.8x)
+        source.playbackRate.value = 0.8;
+        
+        const now = audioContext.currentTime;
+        if (playheadTime < now) {
+            playheadTime = now + 0.05; // Add small delay for smooth transition
+        }
+        source.start(playheadTime);
+        // Adjust for playback rate
+        playheadTime += (buffer.duration / 0.8);
+
+        console.log(`🎵 Day 22: Playing chunk - Duration: ${buffer.duration.toFixed(3)}s, Buffer: ${audioChunks.length} chunks`);
+
+        if (audioChunks.length > 0) {
+            chunkPlay(); // Recursively play next chunk
+        } else {
+            isPlaying = false;
+        }
+    }
+}
+
+// Day 22: Update playback UI
+function updatePlaybackUI(chunkIndex, isFinal) {
+    chunksReceived = chunkIndex + 1;
+    
+    if (chunksReceivedDisplay) {
+        chunksReceivedDisplay.textContent = `Chunks: ${chunksReceived}`;
+        chunksReceivedDisplay.classList.add('audio-chunk-received');
+        setTimeout(() => chunksReceivedDisplay.classList.remove('audio-chunk-received'), 300);
+    }
+    
+    if (playbackTimeDisplay) {
+        playbackTimeDisplay.textContent = `Time: ${totalPlaybackTime.toFixed(1)}s`;
+    }
+    
+    if (audioProgressDisplay) {
+        // Calculate progress more accurately - show 100% when final chunk is received
+        const progress = isFinal ? 100 : Math.min(98, chunksReceived * 3);
+        audioProgressDisplay.textContent = `Progress: ${progress}%`;
+    }
+    
+    if (audioPlaybackStatus) {
+        if (isFinal) {
+            audioPlaybackStatus.textContent = `Playback complete - ${chunksReceived} chunks played seamlessly`;
+        } else {
+            audioPlaybackStatus.textContent = `Playing chunk ${chunksReceived} - Seamless streaming audio`;
+        }
+    }
+}
+
+// Day 22: Finish audio playback
+function finishAudioPlayback() {
+    isStreamingAudio = false;
+    
+    // Wait for remaining chunks to finish playing
+    setTimeout(() => {
+        if (audioChunks.length === 0) {
+            isPlayingAudio = false;
+            console.log('🎵 Day 22: All audio chunks played successfully');
+            
+            // Update progress to 100% when completely finished
+            if (audioProgressDisplay) {
+                audioProgressDisplay.textContent = 'Progress: 100%';
+            }
+            
+            if (audioPlaybackStatus) {
+                audioPlaybackStatus.textContent = `Playback complete - ${chunksReceived} chunks played seamlessly`;
+            }
+            
+            // Reset UI for next session
+            if (streamingAudioStatus) {
+                streamingAudioStatus.textContent = 'Ready to stream and play audio';
+            }
+        }
+    }, 1000);
+    
+    // Reset button states immediately
+    if (startStreamingAudioBtn) startStreamingAudioBtn.disabled = false;
+    if (stopStreamingAudioBtn) stopStreamingAudioBtn.disabled = true;
+    
+    console.log('🎵 Day 22: Audio playback finished, UI reset for next session');
+}
+
+// Day 22: Start streaming audio playback
+function startStreamingAudioPlayback() {
+    const textInput = streamingAudioInput ? streamingAudioInput.value.trim() : '';
+    if (!textInput) {
+        alert('Please enter some text to convert to streaming speech');
+        return;
+    }
+    
+    console.log('🎵 Day 22: Starting streaming audio playback...');
+    
+    // Reset all state variables
+    isStreamingAudio = false;
+    isPlayingAudio = false;
+    audioChunks = [];
+    chunksReceived = 0;
+    totalPlaybackTime = 0;
+    wavHeaderSet = true;
+    
+    // Always ensure fresh WebSocket connection
+    if (!streamingAudioWebSocket || streamingAudioWebSocket.readyState !== WebSocket.OPEN) {
+        console.log('🎵 Day 22: Connecting to WebSocket...');
+        connectStreamingAudioWebSocket();
+        
+        // Wait for connection before proceeding
+        setTimeout(() => {
+            if (streamingAudioWebSocket && streamingAudioWebSocket.readyState === WebSocket.OPEN) {
+                sendStreamingAudioRequest(textInput);
+            } else {
+                console.error('🎵 Day 22: Failed to establish WebSocket connection');
+                if (streamingAudioStatus) {
+                    streamingAudioStatus.textContent = 'Failed to connect to server';
+                }
+                // Reset buttons on failure
+                if (startStreamingAudioBtn) startStreamingAudioBtn.disabled = false;
+                if (stopStreamingAudioBtn) stopStreamingAudioBtn.disabled = true;
+            }
+        }, 1500);
+        return;
+    }
+    
+    // Proceed with sending request
+    sendStreamingAudioRequest(textInput);
+}
+
+// Day 22: Send streaming audio request
+function sendStreamingAudioRequest(text) {
+    const voiceId = llmVoiceSelect ? llmVoiceSelect.value : 'en-US-natalie';
+    
+    console.log(`🎵 Day 22: Sending streaming audio request for text: "${text.substring(0, 50)}..."`);
+    console.log(`🎵 Day 22: WebSocket state: ${streamingAudioWebSocket?.readyState}`);
+    
+    if (!streamingAudioWebSocket || streamingAudioWebSocket.readyState !== WebSocket.OPEN) {
+        console.error('🎵 Day 22: WebSocket not ready for sending request');
+        if (streamingAudioStatus) {
+            streamingAudioStatus.textContent = 'WebSocket connection not ready';
+        }
+        return;
+    }
+    
+    // Reset state
+    isStreamingAudio = true;
+    chunksReceived = 0;
+    totalPlaybackTime = 0;
+    
+    // Update UI
+    if (startStreamingAudioBtn) startStreamingAudioBtn.disabled = true;
+    if (stopStreamingAudioBtn) stopStreamingAudioBtn.disabled = false;
+    
+    const requestData = {
+        text: text,
+        session_id: sessionId || 'default-session',
+        voice_id: voiceId
+    };
+    
+    console.log('🎵 Day 22: Sending request data:', requestData);
+    
+    try {
+        streamingAudioWebSocket.send(JSON.stringify(requestData));
+        
+        if (streamingAudioStatus) {
+            streamingAudioStatus.textContent = 'Processing text and preparing streaming audio...';
+        }
+        
+        if (audioPlaybackStatus) {
+            audioPlaybackStatus.textContent = 'Preparing for seamless audio streaming...';
+        }
+    } catch (error) {
+        console.error('🎵 Day 22: Error sending WebSocket request:', error);
+        if (streamingAudioStatus) {
+            streamingAudioStatus.textContent = 'Error sending request to server';
+        }
+        // Reset buttons on error
+        if (startStreamingAudioBtn) startStreamingAudioBtn.disabled = false;
+        if (stopStreamingAudioBtn) stopStreamingAudioBtn.disabled = true;
+    }
+}
+
+// Day 22: Stop streaming audio playback
+function stopStreamingAudioPlayback() {
+    console.log('🎵 Day 22: Stopping streaming audio playback');
+    
+    // Stop streaming and playback
+    isStreamingAudio = false;
+    isPlayingAudio = false;
+    
+    // Clear audio chunks
+    audioChunks = [];
+    
+    // Close WebSocket connection to stop server streaming
+    if (streamingAudioWebSocket && streamingAudioWebSocket.readyState === WebSocket.OPEN) {
+        streamingAudioWebSocket.close();
+        streamingAudioWebSocket = null;
+        console.log('🎵 Day 22: WebSocket connection closed');
+    }
+    
+    // Completely reset audio context for clean state
+    if (audioContext) {
+        if (audioContext.state !== 'closed') {
+            audioContext.close();
+        }
+        audioContext = null;
+        console.log('🎵 Day 22: Audio context closed and reset');
+    }
+    
+    // Reset all audio state variables
+    playheadTime = 0;
+    wavHeaderSet = true;
+    
+    // Reset UI
+    if (startStreamingAudioBtn) startStreamingAudioBtn.disabled = false;
+    if (stopStreamingAudioBtn) stopStreamingAudioBtn.disabled = true;
+    
+    if (streamingAudioStatus) {
+        streamingAudioStatus.textContent = 'Ready to stream and play audio';
+    }
+    
+    if (audioPlaybackStatus) {
+        audioPlaybackStatus.textContent = 'Ready to stream audio...';
+    }
+    
+    // Reset counters
+    chunksReceived = 0;
+    totalPlaybackTime = 0;
+    updatePlaybackUI(0, false);
+    
+    // Clear visualizer
+    clearAudioVisualizer();
+}
+
+// Day 22: Update audio visualizer
+function updateAudioVisualizer(audioData) {
+    if (!audioCanvasContext || !audioData) return;
+    
+    // Clear canvas
+    audioCanvasContext.clearRect(0, 0, audioCanvas.width, audioCanvas.height);
+    
+    // Draw waveform
+    audioCanvasContext.strokeStyle = '#4caf50';
+    audioCanvasContext.lineWidth = 2;
+    audioCanvasContext.beginPath();
+    
+    const sliceWidth = audioCanvas.width / audioData.length;
+    let x = 0;
+    
+    for (let i = 0; i < audioData.length; i++) {
+        const v = audioData[i] * 0.5; // Scale down amplitude
+        const y = (v * audioCanvas.height / 2) + (audioCanvas.height / 2);
+        
+        if (i === 0) {
+            audioCanvasContext.moveTo(x, y);
+        } else {
+            audioCanvasContext.lineTo(x, y);
+        }
+        
+        x += sliceWidth;
+    }
+    
+    audioCanvasContext.stroke();
+    
+    // Update bar visualizer
+    updateVisualizerBars(audioData);
+}
+
+// Day 22: Update visualizer bars
+function updateVisualizerBars(audioData) {
+    if (!visualizerBars || visualizerBars.length === 0) return;
+    
+    // Calculate RMS values for each bar
+    const barCount = visualizerBars.length;
+    const samplesPerBar = Math.floor(audioData.length / barCount);
+    
+    for (let i = 0; i < barCount; i++) {
+        const bar = visualizerBars[i];
+        if (!bar) continue;
+        
+        // Calculate RMS for this bar's audio segment
+        let sum = 0;
+        const startIdx = i * samplesPerBar;
+        const endIdx = Math.min(startIdx + samplesPerBar, audioData.length);
+        
+        for (let j = startIdx; j < endIdx; j++) {
+            sum += audioData[j] * audioData[j];
+        }
+        
+        const rms = Math.sqrt(sum / (endIdx - startIdx));
+        const height = Math.max(5, Math.min(50, rms * 200)); // Scale to 5-50px
+        
+        bar.style.height = `${height}px`;
+        bar.classList.add('active');
+        
+        // Remove active class after animation
+        setTimeout(() => {
+            bar.classList.remove('active');
+        }, 300);
+    }
+}
+
+// Day 22: Clear audio visualizer
+function clearAudioVisualizer() {
+    if (audioCanvasContext && audioCanvas) {
+        audioCanvasContext.clearRect(0, 0, audioCanvas.width, audioCanvas.height);
+    }
+    
+    if (visualizerBars) {
+        visualizerBars.forEach(bar => {
+            if (bar) {
+                bar.style.height = '10px';
+                bar.classList.remove('pulse');
+            }
+        });
+    }
+}
+
 // Connect to LLM WebSocket
 function connectLLMWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -1087,6 +1651,29 @@ function initApp() {
         base64Input = document.getElementById('base64Input');
         base64AudioChunksDisplay = document.getElementById('base64AudioChunks');
         
+        // Day 22: Initialize streaming audio playback DOM elements
+        startStreamingAudioBtn = document.getElementById('startStreamingAudio');
+        stopStreamingAudioBtn = document.getElementById('stopStreamingAudio');
+        streamingAudioStatus = document.getElementById('streamingAudioStatus');
+        streamingAudioInput = document.getElementById('streamingAudioInput');
+        audioPlaybackStatus = document.getElementById('audioPlaybackStatus');
+        chunksReceivedDisplay = document.getElementById('chunksReceived');
+        audioProgressDisplay = document.getElementById('audioProgress');
+        playbackTimeDisplay = document.getElementById('playbackTime');
+        
+        // Initialize audio visualizer
+        audioCanvas = document.getElementById('audioCanvas');
+        if (audioCanvas) {
+            audioCanvasContext = audioCanvas.getContext('2d');
+        }
+        visualizerBars = [
+            document.getElementById('bar1'),
+            document.getElementById('bar2'),
+            document.getElementById('bar3'),
+            document.getElementById('bar4'),
+            document.getElementById('bar5')
+        ];
+        
         // Log element initialization
         console.log('Elements initialized:', {
             startLLMRecordingBtn: !!startLLMRecordingBtn,
@@ -1115,6 +1702,7 @@ function initApp() {
             connectTranscribeWebSocket();
             connectLLMWebSocket();
             connectBase64AudioWebSocket(); // Day 21: Initialize base64 audio WebSocket
+            connectStreamingAudioWebSocket(); // Day 22: Initialize streaming audio WebSocket
         }, 500);
         
         console.log('Application initialization complete');
@@ -1191,6 +1779,33 @@ function setupEventListeners() {
                 console.error('Error in startBase64AudioStreaming:', error);
                 if (base64Status) {
                     base64Status.textContent = `Error: ${error.message}`;
+                }
+            }
+        });
+    }
+    
+    // Day 22: Streaming audio playback event listeners
+    if (startStreamingAudioBtn) {
+        startStreamingAudioBtn.addEventListener('click', () => {
+            try {
+                startStreamingAudioPlayback();
+            } catch (error) {
+                console.error('Error in startStreamingAudioPlayback:', error);
+                if (streamingAudioStatus) {
+                    streamingAudioStatus.textContent = `Error: ${error.message}`;
+                }
+            }
+        });
+    }
+    
+    if (stopStreamingAudioBtn) {
+        stopStreamingAudioBtn.addEventListener('click', () => {
+            try {
+                stopStreamingAudioPlayback();
+            } catch (error) {
+                console.error('Error in stopStreamingAudioPlayback:', error);
+                if (streamingAudioStatus) {
+                    streamingAudioStatus.textContent = `Error: ${error.message}`;
                 }
             }
         });

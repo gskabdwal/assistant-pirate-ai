@@ -72,20 +72,41 @@
             <div id="llmChatHistory" class="chat-history"></div>
         </div> --> -->
         
-        <!-- Day 21: Base64 Audio Streaming -->
-        <div class="base64-audio-container">
-            <h2>🎵 Base64 Audio Streaming (Day 21)</h2>
-            <div id="base64Status" class="status-message">Enter text to stream as base64 audio chunks</div>
+        <!-- Day 22: Streaming Audio Playback -->
+        <div class="streaming-audio-container">
+            <h2>🎵 Streaming Audio Playback (Day 22)</h2>
+            <div id="streamingAudioStatus" class="status-message">Enter text to stream and play audio in real-time</div>
             <div class="input-controls">
-                <label for="base64Input">Text to convert to speech:</label>
-                <textarea id="base64Input" class="text-input" rows="3" placeholder="Enter text here to convert to streaming base64 audio...">Hello! This is a test of Day 21 base64 audio streaming functionality. The audio will be streamed as base64 chunks directly to the client without playing in an audio element.</textarea>
+                <label for="streamingAudioInput">Text to convert to streaming speech:</label>
+                <textarea id="streamingAudioInput" class="text-input" rows="3" placeholder="Enter text here to convert to streaming audio with real-time playback...">Hello! This is Day 22 - streaming audio playback. The audio will be played seamlessly as chunks arrive from the server.</textarea>
             </div>
             <div class="recording-controls">
-                <button id="startBase64Stream" class="control-btn">Start Base64 Streaming</button>
+                <button id="startStreamingAudio" class="control-btn">Start Streaming Audio</button>
+                <button id="stopStreamingAudio" class="control-btn" disabled>Stop Audio</button>
             </div>
-            <div class="base64-display">
-                <h3>Base64 Audio Chunks</h3>
-                <div id="base64AudioChunks" class="base64-chunks-display">No audio chunks received yet...</div>
+            <div class="audio-playback-display">
+                <h3>Audio Playback Status</h3>
+                <div id="audioPlaybackStatus" class="audio-status-display">Ready to stream audio...</div>
+                <div class="audio-controls">
+                    <div class="audio-info">
+                        <span id="chunksReceived">Chunks: 0</span>
+                        <span id="audioProgress">Progress: 0%</span>
+                        <span id="playbackTime">Time: 0.0s</span>
+                    </div>
+                </div>
+                <div class="audio-visualizer">
+                    <h4>Audio Visualization</h4>
+                    <div class="visualizer-container">
+                        <canvas id="audioCanvas" width="400" height="100"></canvas>
+                        <div class="visualizer-bars">
+                            <div class="bar" id="bar1"></div>
+                            <div class="bar" id="bar2"></div>
+                            <div class="bar" id="bar3"></div>
+                            <div class="bar" id="bar4"></div>
+                            <div class="bar" id="bar5"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

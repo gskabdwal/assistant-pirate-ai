@@ -1,6 +1,7 @@
-# WebSocket Implementation - Days 21-15
+# WebSocket Implementation - Days 22-15
 
 ## Table of Contents
+- [Day 22 - Seamless Streaming Audio Playback]
 - [Day 21 - Base64 Audio Streaming to Client](#day-21---base64-audio-streaming-to-client)
 - [Day 20 - Murf WebSocket TTS Streaming](#day-20---murf-websocket-tts-streaming)
 - [Day 19 - Streaming LLM Responses](#day-19---streaming-llm-responses)
@@ -8,6 +9,86 @@
 - [Day 17 - Real-time Speech Transcription](#day-17---real-time-speech-transcription)
 - [Day 16 - WebSocket Audio Streaming](#day-16---websocket-audio-streaming)
 - [Day 15 - Basic WebSocket Implementation](#day-15---basic-websocket-implementation)
+
+---
+
+## Day 22 - Seamless Streaming Audio Playback
+
+### Overview
+Implemented real-time streaming audio playback using Web Audio API, providing seamless playback of audio chunks as they're received from the Murf TTS service. The implementation includes proper audio buffering, timing, and error handling for a smooth user experience.
+
+### WebSocket Endpoint
+- **URL**: `ws://localhost:8000/ws/streaming-audio`
+- **Protocol**: WebSocket (JSON messages)
+- **TTS Service**: Murf AI WebSocket API
+- **Audio Format**: Base64 encoded WAV/PCM chunks
+- **Playback Rate**: 80% for clearer speech
+
+### Implementation Details
+
+#### Backend
+- **Streaming Pipeline**: Text input → LLM processing → Murf TTS → Web Audio API
+- **Chunk Processing**: Handles WAV headers and PCM data conversion
+- **Connection Management**: Graceful handling of Murf's connection limits (~20 chunks)
+- **Message Types**:
+  - `llm_chunk`: Text chunks from LLM
+  - `llm_complete`: LLM response complete
+  - `audio_stream_start`: Audio streaming started
+  - `audio_chunk`: Base64 audio data chunk
+  - `audio_stream_complete`: Audio streaming finished
+  - `audio_stream_error`: Error during streaming
+- **Error Handling**: Detailed error reporting for TTS failures
+
+#### Frontend
+- **Web Audio API**: Processes and plays audio chunks in real-time
+- **Buffer Queue**: Manages audio chunks for seamless playback
+- **Playback Controls**: Start/stop functionality with proper state management
+- **Real-time Feedback**: Displays chunk count and playback status
+- **Error Handling**: User-friendly error messages and recovery
+
+#### Performance
+- **Chunk Size**: Optimized for low-latency streaming
+- **Playback**: Smooth, continuous audio with minimal buffering
+- **Memory**: Efficient handling of audio data
+
+### Message Protocol
+
+#### Input Message Format
+```json
+{
+  "text": "Text to convert to speech",
+  "session_id": "unique_session_identifier"
+}
+```
+
+#### Output Message Format
+```json
+// Audio Chunk
+{
+  "type": "audio_chunk",
+  "chunk_index": 1,
+  "data": "base64_encoded_audio_chunk"
+}
+
+// Stream Complete
+{
+  "type": "audio_stream_complete",
+  "total_chunks": 20,
+  "message": "Audio streaming completed"
+}
+
+// Error
+{
+  "type": "audio_stream_error",
+  "error": "Error message",
+  "details": "Additional error details"
+}
+```
+
+### Limitations
+- Murf API enforces a limit of ~20-21 audio chunks per connection
+- Connection is automatically terminated after reaching the limit
+- Error handling includes automatic recovery where possible
 
 ---
 
