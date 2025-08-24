@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 </head>
+
 <body>
     <nav class="navbar">
         <div class="nav-container">
@@ -18,99 +20,169 @@
             </ul>
         </div>
     </nav>
-    
+
     <div class="container">
-        <!-- Day 17: Real-time Transcription
-        <div class="streaming-transcription-container">
-            <h2>🎙️ Real-time Transcription (Day 18)</h2>
-            <div id="streamStatus" class="status-message">Press "Start Streaming" to begin real-time transcription</div>
-            <div class="recording-controls">
-                <button id="startStreamRecording" class="control-btn">Start Streaming</button>
-                <button id="stopStreamRecording" class="control-btn" disabled>Stop Streaming</button>
-            </div>
-            <div class="transcription-display">
-                <h3>Live Transcription</h3>
-                <div id="partialTranscript" class="partial-transcript">Partial transcription will appear here...</div>
-                <div id="finalTranscript" class="final-transcript">Final transcription will appear here...</div>
-            </div>
-        </div>
-        
-        <!-- AI Voice Agent with Streaming -->
-        <!-- <div class="llm-voice-container">
-            <h2>AI Voice Agent with Streaming (Day 19)</h2>
-            <div id="llmStatus" class="status-message">Press "Start Recording" to ask the AI a question</div>
-            <div class="recording-controls">
-                <button id="startLLMRecording" class="control-btn">Start Recording</button>
-                <button id="stopLLMRecording" class="control-btn" disabled>Stop Recording</button>
-            </div>
-            <div class="voice-selector">
-                <label for="llmVoiceSelect">AI Voice:</label>
-                <select id="llmVoiceSelect">
-                    <option value="en-IN-rohan" selected>Rohan (English - India)</option>
-                    <option value="en-IN-alia">Alia (English - India)</option>
-                    <option value="en-IN-priya">Priya (English - India)</option>
-                </select>
-            </div>
-            <div class="audio-player">
-                <h3>Your Question</h3>
-                <audio id="llmQuestionAudio" controls></audio>
-                <h3>Transcription</h3>
-                <div id="llmTranscriptionBox" class="transcription-box">
-                    <div id="llmTranscriptionText">Your question will appear here...</div>
+        <!-- Day 23: Complete Voice Agent -->
+        <div class="complete-voice-agent">
+            <div class="hero-section">
+                <h1 class="hero-title">🤖 Complete Voice Agent</h1>
+                <p class="hero-subtitle">Day 23: Real-time conversation with AI using voice</p>
+                <div class="hero-description">
+                    <p>Experience seamless voice interaction: speak naturally, get real-time transcription, AI
+                        processing, and streaming audio responses.</p>
                 </div>
-                <h3>AI Response (Streaming)</h3>
-                <div id="llmResponseBox" class="transcription-box streaming-box">
-                    <div id="llmStreamingText" class="streaming-text"></div>
-                    <div id="llmResponseText" class="final-text">AI response will appear here...</div>
-                </div>
-                <h3>AI Voice Response</h3>
-                <audio id="llmResponseAudio" controls></audio>
             </div>
-        </div>
-        <div class="chat-history-container">
-            <h3>Chat History</h3>
-            <div id="llmChatHistory" class="chat-history"></div>
-        </div> --> -->
-        
-        <!-- Day 22: Streaming Audio Playback -->
-        <div class="streaming-audio-container">
-            <h2>🎵 Streaming Audio Playback (Day 22)</h2>
-            <div id="streamingAudioStatus" class="status-message">Enter text to stream and play audio in real-time</div>
-            <div class="input-controls">
-                <label for="streamingAudioInput">Text to convert to streaming speech:</label>
-                <textarea id="streamingAudioInput" class="text-input" rows="3" placeholder="Enter text here to convert to streaming audio with real-time playback...">Hello! This is Day 22 - streaming audio playback. The audio will be played seamlessly as chunks arrive from the server.</textarea>
-            </div>
-            <div class="recording-controls">
-                <button id="startStreamingAudio" class="control-btn">Start Streaming Audio</button>
-                <button id="stopStreamingAudio" class="control-btn" disabled>Stop Audio</button>
-            </div>
-            <div class="audio-playback-display">
-                <h3>Audio Playback Status</h3>
-                <div id="audioPlaybackStatus" class="audio-status-display">Ready to stream audio...</div>
-                <div class="audio-controls">
-                    <div class="audio-info">
-                        <span id="chunksReceived">Chunks: 0</span>
-                        <span id="audioProgress">Progress: 0%</span>
-                        <span id="playbackTime">Time: 0.0s</span>
+
+            <div class="main-content">
+
+                <div class="left-left">
+                    <div class="pipeline-status">
+                        <h3>Pipeline Status</h3>
+                        <div class="pipeline-steps">
+                            <div class="step" id="step-recording">
+                                <div class="step-icon">🎤</div>
+                                <div class="step-content">
+                                    <div class="step-title">Recording</div>
+                                    <div class="step-status" id="recording-status">Ready</div>
+                                </div>
+                            </div>
+                            <div class="step" id="step-stt">
+                                <div class="step-icon">🎯</div>
+                                <div class="step-content">
+                                    <div class="step-title">Speech-to-Text</div>
+                                    <div class="step-status" id="stt-status">Waiting</div>
+                                </div>
+                            </div>
+                            <div class="step" id="step-ai">
+                                <div class="step-icon">🧠</div>
+                                <div class="step-content">
+                                    <div class="step-title">AI Processing</div>
+                                    <div class="step-status" id="ai-status">Waiting</div>
+                                </div>
+                            </div>
+                            <div class="step" id="step-tts">
+                                <div class="step-icon">🔊</div>
+                                <div class="step-content">
+                                    <div class="step-title">Text-to-Speech</div>
+                                    <div class="step-status" id="tts-status">Waiting</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="audio-visualizer">
-                    <h4>Audio Visualization</h4>
-                    <div class="visualizer-container">
-                        <canvas id="audioCanvas" width="400" height="100"></canvas>
-                        <div class="visualizer-bars">
-                            <div class="bar" id="bar1"></div>
-                            <div class="bar" id="bar2"></div>
-                            <div class="bar" id="bar3"></div>
-                            <div class="bar" id="bar4"></div>
-                            <div class="bar" id="bar5"></div>
+                <div class="left-panel">
+                    <!-- Pipeline Status -->
+
+
+                    <!-- Controls -->
+                    <div class="controls-section">
+                        <div class="voice-selector">
+                            <label for="voiceSelect">AI Voice:</label>
+                            <select id="voiceSelect" class="voice-select">
+                                <option value="en-US-natalie" selected>Natalie (US English)</option>
+                                <option value="en-IN-rohan">Rohan (Indian English)</option>
+                                <option value="en-IN-alia">Alia (Indian English)</option>
+                                <option value="en-IN-priya">Priya (Indian English)</option>
+                            </select>
+                        </div>
+
+                        <div class="recording-controls">
+                            <button id="startRecording" class="btn btn-primary">
+                                <span class="btn-icon">🎤</span>
+                                Start Conversation
+                            </button>
+                            <button id="stopRecording" class="btn btn-secondary" disabled>
+                                <span class="btn-icon">⏹️</span>
+                                Stop Recording
+                            </button>
+                        </div>
+
+                        <div class="connection-status">
+                            <div id="connectionStatus" class="status-indicator">
+                                <span class="status-dot"></span>
+                                <span class="status-text">Connecting...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Transcription -->
+                    <div class="transcription-section">
+                        <h3>Live Transcription</h3>
+                        <div class="transcription-container">
+                            <div id="partialTranscript" class="partial-transcript">
+                                Start speaking to see live transcription...
+                            </div>
+                            <div id="finalTranscript" class="final-transcript">
+                                Your final speech will appear here
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Audio Playback -->
+                    <div class="audio-section">
+                        <h3>Audio Playback</h3>
+                        <div class="audio-controls">
+                            <div class="audio-info">
+                                <div class="info-item">
+                                    <span class="info-label">Chunks:</span>
+                                    <span id="chunksReceived" class="info-value">0</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Progress:</span>
+                                    <span id="audioProgress" class="info-value">0%</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Time:</span>
+                                    <span id="playbackTime" class="info-value">0.0s</span>
+                                </div>
+                            </div>
+                            <div id="audioPlaybackStatus" class="audio-status">
+                                Ready to stream audio...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="right-panel">
+                    <!-- Conversation Display -->
+                    <div class="conversation-section">
+                        <div class="conversation-header">
+                            <h3>Live Conversation</h3>
+                            <div class="conversation-controls">
+                                <button id="clearChat" class="btn btn-outline btn-sm">Clear History</button>
+                            </div>
+                        </div>
+
+                        <div id="conversationDisplay" class="conversation-display">
+                            <div class="welcome-message">
+                                <div class="message-icon">👋</div>
+                                <div class="message-content">
+                                    <h4>Welcome to the Complete Voice Agent!</h4>
+                                    <p>Click "Start Conversation" and begin speaking. Your voice will be transcribed in
+                                        real-time, processed by AI, and you'll hear the response as streaming audio.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat History -->
+                    <div class="chat-history-section">
+                        <div class="chat-header">
+                            <h4>Chat History</h4>
+                            <div id="chatCount" class="chat-count">0 messages</div>
+                        </div>
+                        <div id="chatHistory" class="chat-history">
+                            <div class="empty-history">
+                                <p>No conversation history yet. Start talking to build your chat history!</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <script src="{{ url_for('static', path='/js/app.js') }}"></script>
 </body>
+
 </html>

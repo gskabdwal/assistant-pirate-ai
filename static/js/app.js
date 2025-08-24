@@ -388,21 +388,43 @@ async function startStreamRecording() {
         // Send start command
         transcribeWebSocket.send('START_TRANSCRIPTION');
         
-        // Request microphone access with specific constraints for AssemblyAI
-        const stream = await navigator.mediaDevices.getUserMedia({
+        // Get microphone access with enhanced constraints (EXACTLY like Day 17)
+        completeVoiceStream = await navigator.mediaDevices.getUserMedia({
             audio: {
                 sampleRate: 16000,
                 channelCount: 1,
-                echoCancellation: true,
-                noiseSuppression: true
+                autoGainControl: true,
+                noiseSuppression: false,
+                echoCancellation: false,
+                volume: 1.0
             }
         });
         
-        // Use Web Audio API to get raw PCM data for AssemblyAI
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)({
+        // Log microphone device details
+        const audioTracks = completeVoiceStream.getAudioTracks();
+        if (audioTracks.length > 0) {
+            const track = audioTracks[0];
+            const settings = track.getSettings();
+            console.log('🤖 Day 23: Microphone details:', {
+                deviceId: settings.deviceId,
+                groupId: settings.groupId,
+                label: track.label,
+                sampleRate: settings.sampleRate,
+                channelCount: settings.channelCount,
+                autoGainControl: settings.autoGainControl,
+                noiseSuppression: settings.noiseSuppression,
+                echoCancellation: settings.echoCancellation,
+                volume: settings.volume
+            });
+        }
+        
+        monitorAudio();
+        
+        // Use Web Audio API to get raw PCM data for AssemblyAI (EXACTLY like Day 17)
+        const audioContext16k = new (window.AudioContext || window.webkitAudioContext)({
             sampleRate: 16000
         });
-        const source = audioContext.createMediaStreamSource(stream);
+        const source16k = audioContext16k.createMediaStreamSource(completeVoiceStream);
         const processor = audioContext.createScriptProcessor(4096, 1, 1);
         
         processor.onaudioprocess = (event) => {
@@ -421,24 +443,24 @@ async function startStreamRecording() {
             }
         };
         
-        source.connect(processor);
-        processor.connect(audioContext.destination);
+        source16k.connect(processor);
+        processor.connect(audioContext16k.destination);
         
         // Store references for cleanup
         streamMediaRecorder = {
-            audioContext,
-            source,
+            audioContext: audioContext16k,
+            source: source16k,
             processor,
-            stream,
+            stream: completeVoiceStream,
             start: () => {
                 // Audio processing starts immediately when connected
                 console.log('Audio processing started');
             },
             stop: () => {
                 processor.disconnect();
-                source.disconnect();
-                audioContext.close();
-                stream.getTracks().forEach(track => track.stop());
+                source16k.disconnect();
+                audioContext16k.close();
+                completeVoiceStream.getTracks().forEach(track => track.stop());
             }
         };
         
@@ -448,7 +470,7 @@ async function startStreamRecording() {
             }
             
             // Stop all tracks
-            stream.getTracks().forEach(track => track.stop());
+            completeVoiceStream.getTracks().forEach(track => track.stop());
             
             if (streamStatus) {
                 streamStatus.textContent = 'Transcription stopped';
@@ -1301,6 +1323,53 @@ function connectLLMWebSocket() {
                 if (data.text) {
                     generateTTSForResponse(data.text);
                 }
+                
+                completeVoiceWebSocket.onmessage = (event) => {
+                    console.log('🤖 Day 23: WebSocket message received:', event.data);
+                    
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('🤖 Day 23: Parsed message:', data);
+                        
+                        if (data.type === 'partial_transcript') {
+                            if (partialTranscriptDiv) {
+                                partialTranscriptDiv.textContent = data.text;
+                            }
+                        } else if (data.type === 'final_transcript') {
+                            if (finalTranscriptDiv) {
+                                finalTranscriptDiv.textContent = data.text;
+                            }
+                            if (partialTranscriptDiv) {
+                                partialTranscriptDiv.textContent = 'Processing complete...';
+                            }
+                        } else if (data.type === 'pipeline_status') {
+                            updatePipelineStatus(data.step, data.status);
+                        } else if (data.type === 'audio_chunk') {
+                            // Use Murf cookbook streaming audio playback
+                            playMurfAudioChunk(data.data, data.is_first);
+                        } else if (data.type === 'audio_final') {
+                            console.log('🤖 Day 23: Final audio chunk received');
+                            playFinalMurfAudio();
+                        } else if (data.type === 'audio_complete') {
+                            console.log('🤖 Day 23: Audio generation complete');
+                        } else if (data.type === 'error') {
+                            console.error('🤖 Day 23: Server error:', data.message);
+                            handlePipelineError(data.message);
+                        }
+                    } catch (error) {
+                        console.error('🤖 Day 23: Error parsing WebSocket message:', error);
+                    }
+                };
+                
+                llmWebSocket.onclose = () => {
+                    console.log('LLM WebSocket disconnected');
+                    isLLMStreaming = false;
+                };
+                
+                llmWebSocket.onerror = (error) => {
+                    console.error('LLM WebSocket error:', error);
+                    isLLMStreaming = false;
+                };
             }
             else if (data.type === 'error') {
                 console.error('❌ LLM WebSocket error:', data.message);
@@ -1615,6 +1684,45 @@ function updateChatHistory(messages) {
     llmChatHistory.scrollTop = llmChatHistory.scrollHeight;
 }
 
+// Day 23: Complete Voice Agent Variables
+let completeVoiceWebSocket = null;
+let completeVoiceMediaRecorder = null;
+let completeVoiceStream = null;
+let isCompleteVoiceRecording = false;
+let completeVoiceAudioContext = null;
+let completeVoiceAudioChunks = [];
+let completeVoiceIsPlaying = false;
+let completeVoicePlayheadTime = 0;
+let completeVoiceChunksReceived = 0;
+let completeVoiceTotalPlaybackTime = 0;
+let completeVoiceWavHeaderSet = true;
+
+// Day 23: Complete Voice Agent DOM Elements
+let startRecordingBtn = null;
+let stopRecordingBtn = null;
+let voiceSelect = null;
+let connectionStatus = null;
+let partialTranscriptDiv = null;
+let finalTranscriptDiv = null;
+let chunksReceivedDiv = null;
+let audioProgressDiv = null;
+let playbackTimeDiv = null;
+let audioPlaybackStatusDiv = null;
+let conversationDisplay = null;
+let chatHistory = null;
+let chatCount = null;
+let clearChatBtn = null;
+
+// Pipeline status elements
+let stepRecording = null;
+let stepSTT = null;
+let stepAI = null;
+let stepTTS = null;
+let recordingStatus = null;
+let sttStatus = null;
+let aiStatus = null;
+let ttsStatus = null;
+
 // Initialize the application
 function initApp() {
     try {
@@ -1661,6 +1769,32 @@ function initApp() {
         audioProgressDisplay = document.getElementById('audioProgress');
         playbackTimeDisplay = document.getElementById('playbackTime');
         
+        // Day 23: Initialize Complete Voice Agent DOM elements
+        startRecordingBtn = document.getElementById('startRecording');
+        stopRecordingBtn = document.getElementById('stopRecording');
+        voiceSelect = document.getElementById('voiceSelect');
+        connectionStatus = document.getElementById('connectionStatus');
+        partialTranscriptDiv = document.getElementById('partialTranscript');
+        finalTranscriptDiv = document.getElementById('finalTranscript');
+        chunksReceivedDiv = document.getElementById('chunksReceived');
+        audioProgressDiv = document.getElementById('audioProgress');
+        playbackTimeDiv = document.getElementById('playbackTime');
+        audioPlaybackStatusDiv = document.getElementById('audioPlaybackStatus');
+        conversationDisplay = document.getElementById('conversationDisplay');
+        chatHistory = document.getElementById('chatHistory');
+        chatCount = document.getElementById('chatCount');
+        clearChatBtn = document.getElementById('clearChat');
+        
+        // Pipeline status elements
+        stepRecording = document.getElementById('step-recording');
+        stepSTT = document.getElementById('step-stt');
+        stepAI = document.getElementById('step-ai');
+        stepTTS = document.getElementById('step-tts');
+        recordingStatus = document.getElementById('recording-status');
+        sttStatus = document.getElementById('stt-status');
+        aiStatus = document.getElementById('ai-status');
+        ttsStatus = document.getElementById('tts-status');
+        
         // Initialize audio visualizer
         audioCanvas = document.getElementById('audioCanvas');
         if (audioCanvas) {
@@ -1685,12 +1819,30 @@ function initApp() {
             llmStreamingText: !!llmStreamingText,
             llmQuestionAudio: !!llmQuestionAudio,
             llmResponseAudio: !!llmResponseAudio,
-            llmVoiceSelect: !!llmVoiceSelect
+            llmVoiceSelect: !!llmVoiceSelect,
+            // Day 23 elements
+            startRecordingBtn: !!startRecordingBtn,
+            stopRecordingBtn: !!stopRecordingBtn,
+            voiceSelect: !!voiceSelect,
+            connectionStatus: !!connectionStatus
         });
         
         // Set initial button states
         setLLMButtonStates(false, true);
         setStreamButtonStates(false, true);
+        
+        // Set Complete Voice Agent button states (disabled until WebSocket connects)
+        if (startRecordingBtn) {
+            startRecordingBtn.disabled = true;
+            startRecordingBtn.textContent = 'Connecting...';
+        }
+        if (stopRecordingBtn) {
+            stopRecordingBtn.disabled = true;
+        }
+        if (connectionStatus) {
+            connectionStatus.textContent = 'Connecting...';
+            connectionStatus.className = 'connection-status connecting';
+        }
         
         // Set up event listeners
         setupEventListeners();
@@ -1703,6 +1855,7 @@ function initApp() {
             connectLLMWebSocket();
             connectBase64AudioWebSocket(); // Day 21: Initialize base64 audio WebSocket
             connectStreamingAudioWebSocket(); // Day 22: Initialize streaming audio WebSocket
+            connectCompleteVoiceWebSocket(); // Day 23: Initialize complete voice agent WebSocket
         }, 500);
         
         console.log('Application initialization complete');
@@ -1712,6 +1865,746 @@ function initApp() {
         if (llmStatus) {
             llmStatus.textContent = `Initialization error: ${error.message}`;
         }
+    }
+}
+
+// Day 23: Complete Voice Agent Functions
+
+// Connect to Complete Voice Agent WebSocket
+function connectCompleteVoiceWebSocket() {
+    try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/complete-voice-agent`;
+        
+        console.log('🤖 Day 23: Connecting to Complete Voice Agent WebSocket:', wsUrl);
+        console.log('🤖 Day 23: Protocol:', protocol, 'Host:', window.location.host);
+        
+        // Check if WebSocket is supported
+        if (!window.WebSocket) {
+            console.error('🤖 Day 23: WebSocket not supported by this browser');
+            return;
+        }
+        
+        console.log('🤖 Day 23: Creating WebSocket instance...');
+        completeVoiceWebSocket = new WebSocket(wsUrl);
+        console.log('🤖 Day 23: WebSocket instance created successfully');
+    } catch (error) {
+        console.error('🤖 Day 23: Error creating WebSocket:', error);
+        return;
+    }
+    
+    completeVoiceWebSocket.onopen = () => {
+        console.log('🤖 Day 23: Complete Voice Agent WebSocket connected');
+        if (connectionStatus) {
+            connectionStatus.textContent = 'Connected';
+            connectionStatus.className = 'connection-status connected';
+        }
+        
+        // Enable start button only when WebSocket is ready
+        if (startRecordingBtn) {
+            startRecordingBtn.disabled = false;
+            startRecordingBtn.textContent = 'Start Conversation';
+        }
+    };
+    
+    completeVoiceWebSocket.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            console.log('🤖 Day 23: WebSocket message:', data);
+            
+            handleCompleteVoiceMessage(data);
+            
+        } catch (error) {
+            console.error('🤖 Day 23: Error processing WebSocket message:', error);
+        }
+    };
+    
+    completeVoiceWebSocket.onclose = (event) => {
+        console.log('🤖 Day 23: Complete Voice Agent WebSocket disconnected');
+        console.log('🤖 Day 23: Close event details:', {
+            code: event.code,
+            reason: event.reason,
+            wasClean: event.wasClean
+        });
+        
+        if (connectionStatus) {
+            connectionStatus.textContent = 'Disconnected';
+            connectionStatus.className = 'connection-status disconnected';
+        }
+        
+        // Disable buttons and update connection status
+        if (startRecordingBtn) {
+            startRecordingBtn.disabled = true;
+            startRecordingBtn.textContent = 'Connecting...';
+        }
+        if (stopRecordingBtn) stopRecordingBtn.disabled = true;
+        
+        // Reset pipeline status
+        resetPipelineStatus();
+    };
+    
+    completeVoiceWebSocket.onerror = (error) => {
+        console.error('🤖 Day 23: Complete Voice Agent WebSocket error:', error);
+        console.error('🤖 Day 23: Error details:', {
+            type: error.type,
+            target: error.target,
+            readyState: completeVoiceWebSocket.readyState
+        });
+        
+        if (connectionStatus) {
+            connectionStatus.textContent = 'Error';
+            connectionStatus.className = 'connection-status error';
+        }
+    };
+}
+
+// Handle Complete Voice Agent WebSocket messages
+function handleCompleteVoiceMessage(data) {
+    switch (data.type) {
+        case 'ready':
+            console.log('🤖 Day 23: Complete Voice Agent ready');
+            break;
+            
+        case 'pipeline_status':
+            updatePipelineStatus(data.step, data.status);
+            break;
+            
+        case 'recording_started':
+            console.log('🤖 Day 23: Recording started:', data.message);
+            updatePipelineStatus('recording', 'active');
+            break;
+            
+        case 'recording_stopped':
+            console.log('🤖 Day 23: Recording stopped:', data.message);
+            updatePipelineStatus('recording', 'complete');
+            break;
+            
+        case 'stt_started':
+            console.log('🤖 Day 23: STT started:', data.message);
+            updatePipelineStatus('stt', 'processing');
+            break;
+            
+        case 'partial_transcript':
+            updatePartialTranscript(data.text);
+            if (data.text && data.text.trim()) {
+                updatePipelineStatus('stt', 'processing');
+            }
+            break;
+            
+        case 'final_transcript':
+            updateFinalTranscript(data.text);
+            updatePipelineStatus('stt', 'complete');
+            
+            // Only trigger AI processing if we have actual speech content
+            if (data.text && data.text.trim() && !data.text.includes('No speech detected')) {
+                updatePipelineStatus('ai', 'thinking');
+            } else {
+                // Reset pipeline for next conversation if no speech detected
+                console.log('🤖 Day 23: No speech detected, resetting pipeline');
+                setTimeout(() => {
+                    resetPipelineStatus();
+                }, 2000);
+            }
+            break;
+            
+        case 'llm_chunk':
+            updateLLMResponse(data.text, false);
+            updatePipelineStatus('ai', 'processing');
+            break;
+            
+        case 'llm_complete':
+            updateLLMResponse(data.text, true);
+            updatePipelineStatus('ai', 'complete');
+            updatePipelineStatus('tts', 'generating');
+            break;
+            
+        case 'audio_chunk':
+            // Backend sends audio data in "data" field
+            if (data.data) {
+                playCompleteVoiceAudioChunk(data.data, data.chunk_index, data.is_final);
+            } else {
+                console.error('🤖 Day 23: No audio data found in message:', data);
+            }
+            updatePipelineStatus('tts', 'streaming');
+            break;
+            
+        case 'conversation_update':
+            updateConversationDisplay(data.user_text, data.ai_response);
+            break;
+            
+        case 'chat_history':
+            updateChatHistoryDisplay(data.messages, data.count);
+            break;
+            
+        case 'pipeline_complete':
+            console.log('🤖 Day 23: Pipeline complete:', data.message);
+            updatePipelineStatus('tts', 'complete');
+            // Reset for next conversation
+            setTimeout(() => {
+                resetPipelineStatus();
+            }, 2000);
+            break;
+            
+        case 'pipeline_error':
+        case 'error':
+            handlePipelineError(data.message, data.step);
+            break;
+            
+        default:
+            console.log('🤖 Day 23: Unknown message type:', data.type, data);
+    }
+}
+
+// Update pipeline status
+function updatePipelineStatus(step, status) {
+    const stepElement = document.getElementById(`step-${step}`);
+    const statusElement = document.getElementById(`${step}-status`);
+    
+    if (stepElement && statusElement) {
+        // Remove all status classes
+        stepElement.classList.remove('active', 'completed', 'error');
+        
+        // Add appropriate status class
+        if (status === 'active' || status === 'processing' || status === 'thinking' || status === 'generating' || status === 'streaming') {
+            stepElement.classList.add('active');
+        } else if (status === 'complete' || status === 'completed') {
+            stepElement.classList.add('completed');
+        } else if (status === 'error') {
+            stepElement.classList.add('error');
+        }
+        
+        // Update status text
+        statusElement.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+    }
+    
+    console.log(`🤖 Day 23: Pipeline ${step} status: ${status}`);
+}
+
+// Reset pipeline status
+function resetPipelineStatus() {
+    const steps = ['recording', 'stt', 'ai', 'tts'];
+    steps.forEach(step => {
+        const stepElement = document.getElementById(`step-${step}`);
+        const statusElement = document.getElementById(`${step}-status`);
+        
+        if (stepElement) {
+            stepElement.classList.remove('active', 'completed', 'error');
+        }
+        
+        if (statusElement) {
+            statusElement.textContent = step === 'recording' ? 'Ready' : 'Waiting';
+        }
+    });
+}
+
+// Update partial transcript
+function updatePartialTranscript(text) {
+    if (partialTranscriptDiv) {
+        partialTranscriptDiv.textContent = text;
+        partialTranscriptDiv.scrollTop = partialTranscriptDiv.scrollHeight;
+    }
+}
+
+// Update final transcript
+function updateFinalTranscript(text) {
+    if (finalTranscriptDiv) {
+        finalTranscriptDiv.textContent = text;
+        finalTranscriptDiv.scrollTop = finalTranscriptDiv.scrollHeight;
+    }
+    
+    // Clear partial transcript
+    if (partialTranscriptDiv) {
+        partialTranscriptDiv.textContent = 'Start speaking to see live transcription...';
+    }
+}
+
+// Update LLM response
+function updateLLMResponse(text, isComplete) {
+    if (conversationDisplay) {
+        // Find or create AI response section
+        let aiSection = conversationDisplay.querySelector('.ai-response');
+        if (!aiSection) {
+            aiSection = document.createElement('div');
+            aiSection.className = 'ai-response';
+            aiSection.innerHTML = '<div class="response-label">AI Response:</div><div class="response-text"></div>';
+            conversationDisplay.appendChild(aiSection);
+        }
+        
+        const responseText = aiSection.querySelector('.response-text');
+        if (responseText) {
+            responseText.textContent = text;
+            responseText.scrollTop = responseText.scrollHeight;
+        }
+        
+        conversationDisplay.scrollTop = conversationDisplay.scrollHeight;
+    }
+}
+
+// Update conversation display
+function updateConversationDisplay(userText, aiResponse) {
+    if (conversationDisplay) {
+        conversationDisplay.innerHTML = `
+            <div class="user-speech">
+                <div class="speech-label">Your Speech:</div>
+                <div class="speech-text">${userText}</div>
+            </div>
+            <div class="ai-response">
+                <div class="response-label">AI Response:</div>
+                <div class="response-text">${aiResponse}</div>
+            </div>
+        `;
+        conversationDisplay.scrollTop = conversationDisplay.scrollHeight;
+    }
+}
+
+// Update chat history display
+function updateChatHistoryDisplay(messages, count) {
+    if (chatCount) {
+        chatCount.textContent = `${count} messages`;
+    }
+    
+    if (chatHistory && messages) {
+        chatHistory.innerHTML = '';
+        
+        messages.forEach(msg => {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${msg.role}`;
+            messageDiv.innerHTML = `
+                <div class="message-role">${msg.role === 'user' ? 'You' : 'AI'}</div>
+                <div class="message-content">${msg.content}</div>
+                <div class="message-time">${new Date(msg.timestamp).toLocaleTimeString()}</div>
+            `;
+            chatHistory.appendChild(messageDiv);
+        });
+        
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+}
+
+// Handle pipeline errors
+function handlePipelineError(message, step) {
+    console.error(`🤖 Day 23: Pipeline error in ${step}:`, message);
+    
+    // Update pipeline status to error
+    if (step) {
+        updatePipelineStatus(step, 'error');
+    }
+    
+    // Show error in appropriate UI element
+    if (connectionStatus) {
+        connectionStatus.textContent = `Error: ${message}`;
+        connectionStatus.className = 'connection-status error';
+    }
+    
+    // Stop recording if active
+    if (isCompleteVoiceRecording) {
+        stopCompleteVoiceRecording();
+    }
+}
+
+// Initialize Complete Voice Agent audio context
+function initCompleteVoiceAudioContext() {
+    if (!completeVoiceAudioContext) {
+        completeVoiceAudioContext = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 44100
+        });
+        console.log('🤖 Day 23: Audio context initialized for Complete Voice Agent');
+    }
+}
+
+// Convert base64 to PCM Float32 for Complete Voice Agent
+// Day 22 working implementation - Convert base64 to PCM Float32 (fixed for proper audio quality)
+function completeVoiceBase64ToPCMFloat32(base64Audio) {
+    try {
+        // Validate input
+        if (!base64Audio || typeof base64Audio !== 'string') {
+            console.error('🤖 Day 23: Invalid base64Audio input:', base64Audio);
+            return null;
+        }
+        
+        // Clean the base64 string - remove any whitespace and line breaks
+        const cleanBase64 = base64Audio.replace(/\s+/g, '');
+        
+        let binary = atob(cleanBase64);
+        const offset = completeVoiceWavHeaderSet ? 44 : 0; // Skip WAV header if present
+        if (completeVoiceWavHeaderSet) {
+            console.log('🤖 Day 23: Skipping WAV header for first chunk');
+            completeVoiceWavHeaderSet = false;
+        }
+        const length = binary.length - offset;
+
+        const buffer = new ArrayBuffer(length);
+        const byteArray = new Uint8Array(buffer);
+        for (let i = 0; i < byteArray.length; i++) {
+            byteArray[i] = binary.charCodeAt(i + offset);
+        }
+
+        const view = new DataView(byteArray.buffer);
+        const sampleCount = byteArray.length / 2;
+        const float32Array = new Float32Array(sampleCount);
+
+        for (let i = 0; i < sampleCount; i++) {
+            const int16 = view.getInt16(i * 2, true);
+            float32Array[i] = int16 / 32768;
+        }
+
+        console.log(`🤖 Day 23: Converted ${sampleCount} samples from base64`);
+        return float32Array;
+        
+    } catch (error) {
+        console.error('🤖 Day 23: Error converting base64 to PCM:', error);
+        return null;
+    }
+}
+
+// Play audio chunk for Complete Voice Agent
+function playCompleteVoiceAudioChunk(base64Audio, chunkIndex, isFinal) {
+    try {
+        initCompleteVoiceAudioContext();
+        
+        const float32Array = completeVoiceBase64ToPCMFloat32(base64Audio);
+        if (!float32Array) {
+            return;
+        }
+        
+        completeVoiceAudioChunks.push(float32Array);
+        
+        // Start playing immediately when we have chunks and not already playing
+        if (!completeVoiceIsPlaying && completeVoiceAudioChunks.length >= 1) {
+            completeVoiceIsPlaying = true;
+            if (completeVoiceAudioContext.state === 'suspended') {
+                completeVoiceAudioContext.resume();
+            }
+            playNextCompleteVoiceChunk();
+        }
+        
+        // Update UI
+        updateCompleteVoicePlaybackUI(chunkIndex, isFinal);
+        
+        console.log(`🤖 Day 23: Audio chunk queued - ${completeVoiceAudioChunks.length} chunks in buffer`);
+        
+    } catch (error) {
+        console.error('🤖 Day 23: Error in playCompleteVoiceAudioChunk:', error);
+    }
+}
+
+// Play next chunk in queue for Complete Voice Agent
+function playNextCompleteVoiceChunk() {
+    if (completeVoiceAudioChunks.length > 0) {
+        const chunk = completeVoiceAudioChunks.shift();
+        
+        if (completeVoiceAudioContext.state === 'suspended') {
+            completeVoiceAudioContext.resume();
+        }
+        
+        const buffer = completeVoiceAudioContext.createBuffer(1, chunk.length, 44100);
+        buffer.copyToChannel(chunk, 0);
+        const source = completeVoiceAudioContext.createBufferSource();
+        source.buffer = buffer;
+        
+        // Add gain node for volume control
+        const gainNode = completeVoiceAudioContext.createGain();
+        gainNode.gain.value = 0.8;
+        source.connect(gainNode);
+        gainNode.connect(completeVoiceAudioContext.destination);
+        
+        const now = completeVoiceAudioContext.currentTime;
+        if (completeVoicePlayheadTime < now) {
+            completeVoicePlayheadTime = now + 0.05;
+        }
+        source.start(completeVoicePlayheadTime);
+        completeVoicePlayheadTime += buffer.duration;
+        
+        completeVoiceTotalPlaybackTime += buffer.duration;
+        
+        console.log(`🤖 Day 23: Playing chunk - Duration: ${buffer.duration.toFixed(3)}s, Buffer: ${completeVoiceAudioChunks.length} chunks`);
+        
+        if (completeVoiceAudioChunks.length > 0) {
+            playNextCompleteVoiceChunk();
+        } else {
+            completeVoiceIsPlaying = false;
+        }
+    }
+}
+
+// Update playback UI for Complete Voice Agent
+function updateCompleteVoicePlaybackUI(chunkIndex, isFinal) {
+    completeVoiceChunksReceived = chunkIndex + 1;
+    
+    if (chunksReceivedDiv) {
+        chunksReceivedDiv.textContent = `${completeVoiceChunksReceived}`;
+        chunksReceivedDiv.classList.add('audio-chunk-received');
+        setTimeout(() => chunksReceivedDiv.classList.remove('audio-chunk-received'), 300);
+    }
+    
+    if (playbackTimeDiv) {
+        playbackTimeDiv.textContent = `${completeVoiceTotalPlaybackTime.toFixed(1)}s`;
+    }
+    
+    if (audioProgressDiv) {
+        const progress = isFinal ? 100 : Math.min(98, completeVoiceChunksReceived * 3);
+        audioProgressDiv.textContent = `${progress}%`;
+    }
+    
+    if (audioPlaybackStatusDiv) {
+        if (isFinal) {
+            audioPlaybackStatusDiv.textContent = `Playback complete - ${completeVoiceChunksReceived} chunks played seamlessly`;
+        } else {
+            audioPlaybackStatusDiv.textContent = `Playing chunk ${completeVoiceChunksReceived} - Seamless streaming audio`;
+        }
+    }
+}
+
+// Start Complete Voice Agent recording
+async function startCompleteVoiceRecording() {
+    if (isCompleteVoiceRecording) {
+        console.log('🤖 Day 23: Recording already in progress');
+        return;
+    }
+    
+    try {
+        console.log('🤖 Day 23: Starting Complete Voice Agent recording...');
+        
+        // Check WebSocket connection
+        if (!completeVoiceWebSocket || completeVoiceWebSocket.readyState !== WebSocket.OPEN) {
+            throw new Error('WebSocket not connected');
+        }
+        
+        // Request microphone access with EXACT Day 17 constraints
+        const constraints = {
+            audio: {
+                sampleRate: 16000,
+                channelCount: 1,
+                autoGainControl: true,
+                noiseSuppression: false,
+                echoCancellation: false,
+                volume: 1.0
+            }
+        };
+        
+        console.log('🤖 Day 23: Requesting microphone access with constraints:', constraints);
+        
+        completeVoiceStream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log('🤖 Day 23: Microphone access granted, stream active:', completeVoiceStream.active);
+        
+        // Log detailed microphone information
+        const audioTracks = completeVoiceStream.getAudioTracks();
+        if (audioTracks.length > 0) {
+            const track = audioTracks[0];
+            const settings = track.getSettings();
+            console.log('🤖 Day 23: Microphone details:', {
+                label: track.label,
+                enabled: track.enabled,
+                readyState: track.readyState,
+                deviceId: settings.deviceId,
+                sampleRate: settings.sampleRate,
+                channelCount: settings.channelCount,
+                autoGainControl: settings.autoGainControl,
+                noiseSuppression: settings.noiseSuppression,
+                echoCancellation: settings.echoCancellation
+            });
+        }
+        
+        // Reset state
+        completeVoiceAudioChunks = [];
+        completeVoiceChunksReceived = 0;
+        completeVoiceTotalPlaybackTime = 0;
+        completeVoicePlayheadTime = 0;
+        
+        // Clear previous conversation
+        if (partialTranscriptDiv) {
+            partialTranscriptDiv.textContent = 'Listening...';
+        }
+        if (finalTranscriptDiv) {
+            finalTranscriptDiv.textContent = 'Your final speech will appear here';
+        }
+        
+        // Create audio context for level monitoring
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(completeVoiceStream);
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        
+        // Monitor audio levels with more detailed logging
+        let audioLevelCount = 0;
+        const monitorAudio = () => {
+            if (isCompleteVoiceRecording) {
+                analyser.getByteFrequencyData(dataArray);
+                const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+                const max = Math.max(...dataArray);
+                
+                audioLevelCount++;
+                // Log every 50th reading (about once per second) or when audio detected
+                if (audioLevelCount % 50 === 0 || average > 5) {
+                    console.log(`🤖 Day 23: Audio levels - Avg: ${average.toFixed(2)}, Max: ${max}, Samples: ${dataArray.length}`);
+                }
+                
+                if (average > 10) { // Threshold for detecting speech
+                    console.log(`🤖 Day 23: Speech detected! Level: ${average.toFixed(2)}`);
+                }
+                
+                requestAnimationFrame(monitorAudio);
+            }
+        };
+        monitorAudio();
+        
+        // Use Web Audio API to get raw PCM data for AssemblyAI (like Day 17)
+        const audioContext16k = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 16000
+        });
+        const source16k = audioContext16k.createMediaStreamSource(completeVoiceStream);
+        const processor = audioContext16k.createScriptProcessor(4096, 1, 1);
+        
+        processor.onaudioprocess = (event) => {
+            console.log(`🤖 Day 23: onaudioprocess fired - Recording: ${isCompleteVoiceRecording}, WebSocket: ${completeVoiceWebSocket?.readyState}`);
+            
+            if (completeVoiceWebSocket && completeVoiceWebSocket.readyState === WebSocket.OPEN && isCompleteVoiceRecording) {
+                const inputBuffer = event.inputBuffer;
+                const inputData = inputBuffer.getChannelData(0);
+                
+                // Check audio levels
+                const maxLevel = Math.max(...inputData.map(Math.abs));
+                console.log(`🤖 Day 23: Audio level: ${maxLevel.toFixed(4)}, Samples: ${inputData.length}`);
+                
+                // Convert float32 to int16 PCM (EXACT Day 17 implementation)
+                const pcmData = new Int16Array(inputData.length);
+                for (let i = 0; i < inputData.length; i++) {
+                    pcmData[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+                }
+                
+                console.log(`🤖 Day 23: Sending ${pcmData.buffer.byteLength} bytes to WebSocket`);
+                completeVoiceWebSocket.send(pcmData.buffer);
+            } else {
+                console.log(`🤖 Day 23: Skipping - conditions not met`);
+            }
+        };
+        
+        source16k.connect(processor);
+        processor.connect(audioContext16k.destination);
+        
+        // CRITICAL FIX: Ensure audio context is resumed (required for Chrome)
+        if (audioContext16k.state === 'suspended') {
+            console.log('🤖 Day 23: Audio context suspended, resuming...');
+            audioContext16k.resume().then(() => {
+                console.log('🤖 Day 23: Audio context resumed successfully');
+            }).catch(err => {
+                console.error('🤖 Day 23: Failed to resume audio context:', err);
+            });
+        } else {
+            console.log(`🤖 Day 23: Audio context state: ${audioContext16k.state}`);
+        }
+        
+        // Set recording flag immediately - don't wait for MediaRecorder events
+        isCompleteVoiceRecording = true;
+        console.log('🤖 Day 23: Recording flag set to true');
+        
+        // Store references for cleanup
+        completeVoiceMediaRecorder = {
+            audioContext: audioContext16k,
+            source: source16k,
+            processor,
+            stream: completeVoiceStream,
+            start: () => {
+                console.log('🤖 Day 23: PCM audio processing started');
+            },
+            stop: () => {
+                processor.disconnect();
+                source16k.disconnect();
+                audioContext16k.close();
+                completeVoiceStream.getTracks().forEach(track => track.stop());
+            }
+        };
+        
+        completeVoiceMediaRecorder.onstart = () => {
+            console.log('🤖 Day 23: MediaRecorder started');
+            updatePipelineStatus('recording', 'active');
+        };
+        
+        completeVoiceMediaRecorder.onstop = () => {
+            console.log('🤖 Day 23: MediaRecorder stopped');
+            isCompleteVoiceRecording = false;
+            updatePipelineStatus('recording', 'complete');
+            
+            // Clean up stream
+            if (completeVoiceStream) {
+                completeVoiceStream.getTracks().forEach(track => track.stop());
+                completeVoiceStream = null;
+            }
+        };
+        
+        // Send start command with voice selection
+        const voiceId = voiceSelect ? voiceSelect.value : 'en-US-natalie';
+        completeVoiceWebSocket.send(JSON.stringify({
+            type: 'start_recording',
+            session_id: sessionId || 'default-session',
+            voice_id: voiceId
+        }));
+        
+        // Start recording with 100ms chunks
+        completeVoiceMediaRecorder.start(100);
+        
+        // Update UI
+        if (startRecordingBtn) startRecordingBtn.disabled = true;
+        if (stopRecordingBtn) stopRecordingBtn.disabled = false;
+        
+        console.log('🤖 Day 23: Recording started successfully');
+        
+    } catch (error) {
+        console.error('🤖 Day 23: Error starting recording:', error);
+        handlePipelineError(error.message, 'recording');
+        
+        // Clean up on error
+        if (completeVoiceStream) {
+            completeVoiceStream.getTracks().forEach(track => track.stop());
+            completeVoiceStream = null;
+        }
+        isCompleteVoiceRecording = false;
+    }
+}
+
+// Stop Complete Voice Agent recording
+function stopCompleteVoiceRecording() {
+    console.log('🤖 Day 23: Stopping Complete Voice Agent recording...');
+    
+    if (completeVoiceMediaRecorder && completeVoiceMediaRecorder.state !== 'inactive') {
+        completeVoiceMediaRecorder.stop();
+    }
+    
+    // Send stop command
+    if (completeVoiceWebSocket && completeVoiceWebSocket.readyState === WebSocket.OPEN) {
+        completeVoiceWebSocket.send(JSON.stringify({
+            type: 'stop_recording'
+        }));
+    }
+    
+    // Update UI
+    if (startRecordingBtn) startRecordingBtn.disabled = false;
+    if (stopRecordingBtn) stopRecordingBtn.disabled = true;
+    
+    isCompleteVoiceRecording = false;
+}
+
+// Clear chat history
+function clearCompleteVoiceChatHistory() {
+    if (completeVoiceWebSocket && completeVoiceWebSocket.readyState === WebSocket.OPEN) {
+        completeVoiceWebSocket.send(JSON.stringify({
+            type: 'clear_chat',
+            session_id: sessionId || 'default-session'
+        }));
+    }
+    
+    // Clear UI
+    if (chatHistory) {
+        chatHistory.textContent = 'No conversation history yet.';
+    }
+    if (chatCount) {
+        chatCount.textContent = '0 messages';
+    }
+    if (conversationDisplay) {
+        conversationDisplay.innerHTML = '<div class="welcome-message">👋 Welcome! Click "Start Conversation" and begin speaking to interact with your AI voice agent.</div>';
     }
 }
 
@@ -1807,6 +2700,38 @@ function setupEventListeners() {
                 if (streamingAudioStatus) {
                     streamingAudioStatus.textContent = `Error: ${error.message}`;
                 }
+            }
+        });
+    }
+    
+    // Day 23: Complete Voice Agent event listeners
+    if (startRecordingBtn) {
+        startRecordingBtn.addEventListener('click', async () => {
+            try {
+                await startCompleteVoiceRecording();
+            } catch (error) {
+                console.error('🤖 Day 23: Error in startCompleteVoiceRecording:', error);
+                handlePipelineError(error.message, 'recording');
+            }
+        });
+    }
+    
+    if (stopRecordingBtn) {
+        stopRecordingBtn.addEventListener('click', () => {
+            try {
+                stopCompleteVoiceRecording();
+            } catch (error) {
+                console.error('🤖 Day 23: Error in stopCompleteVoiceRecording:', error);
+            }
+        });
+    }
+    
+    if (clearChatBtn) {
+        clearChatBtn.addEventListener('click', () => {
+            try {
+                clearCompleteVoiceChatHistory();
+            } catch (error) {
+                console.error('🤖 Day 23: Error in clearCompleteVoiceChatHistory:', error);
             }
         });
     }

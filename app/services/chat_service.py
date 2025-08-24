@@ -111,6 +111,18 @@ class ChatService:
         logger.warning(f"Attempted to clear non-existent session {session_id[:8]}...")
         return False
     
+    def clear_history(self, session_id: str) -> bool:
+        """
+        Alias for clear_session to maintain compatibility.
+        
+        Args:
+            session_id: Session identifier
+            
+        Returns:
+            True if session was cleared, False if session didn't exist
+        """
+        return self.clear_session(session_id)
+    
     def get_all_sessions(self) -> List[str]:
         """
         Get list of all active session IDs.
