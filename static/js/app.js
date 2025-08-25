@@ -1708,7 +1708,7 @@ let chunksReceivedDiv = null;
 let audioProgressDiv = null;
 let playbackTimeDiv = null;
 let audioPlaybackStatusDiv = null;
-let conversationDisplay = null;
+// Removed conversationDisplay - using single chat history only
 let chatHistory = null;
 let chatCount = null;
 let clearChatBtn = null;
@@ -1780,7 +1780,7 @@ function initApp() {
         audioProgressDiv = document.getElementById('audioProgress');
         playbackTimeDiv = document.getElementById('playbackTime');
         audioPlaybackStatusDiv = document.getElementById('audioPlaybackStatus');
-        conversationDisplay = document.getElementById('conversationDisplay');
+        // conversationDisplay removed - using single chat history only
         chatHistory = document.getElementById('chatHistory');
         chatCount = document.getElementById('chatCount');
         clearChatBtn = document.getElementById('clearChat');
@@ -1932,6 +1932,46 @@ function connectCompleteVoiceWebSocket() {
             connectionStatus.className = 'connection-status disconnected';
         }
         
+        // Clean up all recording resources on disconnect
+        if (isCompleteVoiceRecording) {
+            console.log('🤖 Day 23: Cleaning up recording resources due to WebSocket disconnect');
+            
+            // Stop recording flag
+            isCompleteVoiceRecording = false;
+            
+            // Clean up media stream and tracks
+            if (completeVoiceStream) {
+                completeVoiceStream.getTracks().forEach(track => {
+                    track.stop();
+                    console.log('🤖 Day 23: Stopped audio track on disconnect:', track.label);
+                });
+                completeVoiceStream = null;
+            }
+            
+            // Clean up audio context
+            if (completeVoiceAudioContext) {
+                try {
+                    if (completeVoiceAudioContext.state !== 'closed') {
+                        completeVoiceAudioContext.close();
+                        console.log('🤖 Day 23: Closed audio context on disconnect');
+                    }
+                } catch (error) {
+                    console.warn('🤖 Day 23: Error closing audio context on disconnect:', error);
+                }
+                completeVoiceAudioContext = null;
+            }
+            
+            // Clean up script processor
+            if (completeVoiceScriptProcessor) {
+                completeVoiceScriptProcessor.disconnect();
+                completeVoiceScriptProcessor = null;
+                console.log('🤖 Day 23: Disconnected script processor on disconnect');
+            }
+            
+            // Reset media recorder
+            completeVoiceMediaRecorder = null;
+        }
+        
         // Disable buttons and update connection status
         if (startRecordingBtn) {
             startRecordingBtn.disabled = true;
@@ -1995,11 +2035,11 @@ function handleCompleteVoiceMessage(data) {
             updateFinalTranscript(data.text);
             updatePipelineStatus('stt', 'complete');
             
-            // Only trigger AI processing if we have actual speech content
-            if (data.text && data.text.trim() && !data.text.includes('No speech detected')) {
-                updatePipelineStatus('ai', 'thinking');
-            } else {
-                // Reset pipeline for next conversation if no speech detected
+            // Don't add unrefined final transcripts to chat history
+            // Wait for refined_final_transcript instead
+            
+            // Reset pipeline if no speech detected
+            if (!data.text || !data.text.trim() || data.text.includes('No speech detected')) {
                 console.log('🤖 Day 23: No speech detected, resetting pipeline');
                 setTimeout(() => {
                     resetPipelineStatus();
@@ -2007,15 +2047,42 @@ function handleCompleteVoiceMessage(data) {
             }
             break;
             
+        case 'refined_final_transcript':
+            // This is the refined transcript - add to chat history
+            if (data.text && data.text.trim()) {
+                // Check if this transcript is already in chat history
+                const existingMessages = document.querySelectorAll('.chat-message.user .message-text');
+                const isDuplicate = Array.from(existingMessages).some(msg => 
+                    msg.textContent.trim().toLowerCase() === data.text.trim().toLowerCase()
+                );
+                
+                if (!isDuplicate) {
+                    addMessageToChatHistory('user', data.text);
+                    updatePipelineStatus('ai', 'thinking');
+                    console.log('🤖 Day 23: Added refined transcript to chat:', data.text);
+                }
+            }
+            break;
+            
         case 'llm_chunk':
-            updateLLMResponse(data.text, false);
             updatePipelineStatus('ai', 'processing');
+            // Just show streaming chunks in real-time, don't save to chat yet
+            // updateCurrentAIMessage(data.text);
             break;
             
         case 'llm_complete':
-            updateLLMResponse(data.text, true);
             updatePipelineStatus('ai', 'complete');
             updatePipelineStatus('tts', 'generating');
+            
+            // Add final complete response to chat history
+            if (data.text && data.text.trim()) {
+                addMessageToChatHistory('assistant', data.text);
+            }
+            break;
+            
+        case 'tts_complete':
+            console.log('🤖 Day 23: TTS complete:', data.message);
+            // TTS is complete, audio playback will continue
             break;
             
         case 'audio_chunk':
@@ -2029,7 +2096,7 @@ function handleCompleteVoiceMessage(data) {
             break;
             
         case 'conversation_update':
-            updateConversationDisplay(data.user_text, data.ai_response);
+            // Handle via chat history - no separate conversation display
             break;
             
         case 'chat_history':
@@ -2039,10 +2106,14 @@ function handleCompleteVoiceMessage(data) {
         case 'pipeline_complete':
             console.log('🤖 Day 23: Pipeline complete:', data.message);
             updatePipelineStatus('tts', 'complete');
-            // Reset for next conversation
+            
+            // Finalize the current AI message
+            finalizeCurrentAIMessage();
+            
+            // Reset pipeline after a short delay
             setTimeout(() => {
                 resetPipelineStatus();
-            }, 2000);
+            }, 3000);
             break;
             
         case 'pipeline_error':
@@ -2095,6 +2166,22 @@ function resetPipelineStatus() {
             statusElement.textContent = step === 'recording' ? 'Ready' : 'Waiting';
         }
     });
+    
+    // Reset audio playback status
+    const audioPlaybackStatusDiv = document.getElementById('audio-playback-status');
+    if (audioPlaybackStatusDiv) {
+        audioPlaybackStatusDiv.textContent = 'Ready to play audio...';
+    }
+    
+    // Clear transcription displays
+    if (partialTranscriptDiv) {
+        partialTranscriptDiv.textContent = 'Start speaking to see live transcription...';
+    }
+    if (finalTranscriptDiv) {
+        finalTranscriptDiv.textContent = 'Your final transcription will appear here...';
+    }
+    
+    // Chat history persists - no clearing needed
 }
 
 // Update partial transcript
@@ -2118,43 +2205,79 @@ function updateFinalTranscript(text) {
     }
 }
 
-// Update LLM response
-function updateLLMResponse(text, isComplete) {
-    if (conversationDisplay) {
-        // Find or create AI response section
-        let aiSection = conversationDisplay.querySelector('.ai-response');
-        if (!aiSection) {
-            aiSection = document.createElement('div');
-            aiSection.className = 'ai-response';
-            aiSection.innerHTML = '<div class="response-label">AI Response:</div><div class="response-text"></div>';
-            conversationDisplay.appendChild(aiSection);
-        }
-        
-        const responseText = aiSection.querySelector('.response-text');
-        if (responseText) {
-            responseText.textContent = text;
-            responseText.scrollTop = responseText.scrollHeight;
-        }
-        
-        conversationDisplay.scrollTop = conversationDisplay.scrollHeight;
+// Global variable to track current AI message being typed
+let currentAIMessageElement = null;
+
+// Add message to chat history
+function addMessageToChatHistory(role, text) {
+    if (!chatHistory) return;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${role}`;
+    messageDiv.innerHTML = `
+        <div class="message-role">${role === 'user' ? 'You' : 'AI'}</div>
+        <div class="message-content">${text}</div>
+        <div class="message-time">${new Date().toLocaleTimeString()}</div>
+    `;
+    
+    chatHistory.appendChild(messageDiv);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+    
+    // Update chat count
+    const messageCount = chatHistory.children.length;
+    if (chatCount) {
+        chatCount.textContent = `${messageCount} messages`;
     }
 }
 
-// Update conversation display
-function updateConversationDisplay(userText, aiResponse) {
-    if (conversationDisplay) {
-        conversationDisplay.innerHTML = `
-            <div class="user-speech">
-                <div class="speech-label">Your Speech:</div>
-                <div class="speech-text">${userText}</div>
-            </div>
-            <div class="ai-response">
-                <div class="response-label">AI Response:</div>
-                <div class="response-text">${aiResponse}</div>
-            </div>
+// Update current AI message being typed (for streaming)
+function updateCurrentAIMessage(text) {
+    if (!chatHistory) return;
+    
+    // Find or create current AI message element
+    if (!currentAIMessageElement) {
+        currentAIMessageElement = document.createElement('div');
+        currentAIMessageElement.className = 'chat-message assistant typing';
+        currentAIMessageElement.innerHTML = `
+            <div class="message-role">AI</div>
+            <div class="message-content"></div>
+            <div class="message-time">${new Date().toLocaleTimeString()}</div>
         `;
-        conversationDisplay.scrollTop = conversationDisplay.scrollHeight;
+        chatHistory.appendChild(currentAIMessageElement);
     }
+    
+    // Update the content
+    const contentDiv = currentAIMessageElement.querySelector('.message-content');
+    if (contentDiv) {
+        contentDiv.textContent = text;
+    }
+    
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+// Finalize current AI message (remove typing indicator)
+function finalizeCurrentAIMessage() {
+    if (currentAIMessageElement) {
+        currentAIMessageElement.classList.remove('typing');
+        currentAIMessageElement = null;
+        
+        // Update chat count
+        const messageCount = chatHistory.children.length;
+        if (chatCount) {
+            chatCount.textContent = `${messageCount} messages`;
+        }
+    }
+}
+
+// Clear chat history
+function clearChatHistory() {
+    if (chatHistory) {
+        chatHistory.innerHTML = '';
+    }
+    if (chatCount) {
+        chatCount.textContent = '0 messages';
+    }
+    currentAIMessageElement = null;
 }
 
 // Update chat history display
@@ -2452,13 +2575,13 @@ async function startCompleteVoiceRecording() {
         monitorAudio();
         
         // Use Web Audio API to get raw PCM data for AssemblyAI (like Day 17)
-        const audioContext16k = new (window.AudioContext || window.webkitAudioContext)({
+        completeVoiceAudioContext = new (window.AudioContext || window.webkitAudioContext)({
             sampleRate: 16000
         });
-        const source16k = audioContext16k.createMediaStreamSource(completeVoiceStream);
-        const processor = audioContext16k.createScriptProcessor(4096, 1, 1);
+        const source16k = completeVoiceAudioContext.createMediaStreamSource(completeVoiceStream);
+        completeVoiceScriptProcessor = completeVoiceAudioContext.createScriptProcessor(4096, 1, 1);
         
-        processor.onaudioprocess = (event) => {
+        completeVoiceScriptProcessor.onaudioprocess = (event) => {
             console.log(`🤖 Day 23: onaudioprocess fired - Recording: ${isCompleteVoiceRecording}, WebSocket: ${completeVoiceWebSocket?.readyState}`);
             
             if (completeVoiceWebSocket && completeVoiceWebSocket.readyState === WebSocket.OPEN && isCompleteVoiceRecording) {
@@ -2482,19 +2605,19 @@ async function startCompleteVoiceRecording() {
             }
         };
         
-        source16k.connect(processor);
-        processor.connect(audioContext16k.destination);
+        source16k.connect(completeVoiceScriptProcessor);
+        completeVoiceScriptProcessor.connect(completeVoiceAudioContext.destination);
         
         // CRITICAL FIX: Ensure audio context is resumed (required for Chrome)
-        if (audioContext16k.state === 'suspended') {
+        if (completeVoiceAudioContext.state === 'suspended') {
             console.log('🤖 Day 23: Audio context suspended, resuming...');
-            audioContext16k.resume().then(() => {
+            completeVoiceAudioContext.resume().then(() => {
                 console.log('🤖 Day 23: Audio context resumed successfully');
             }).catch(err => {
                 console.error('🤖 Day 23: Failed to resume audio context:', err);
             });
         } else {
-            console.log(`🤖 Day 23: Audio context state: ${audioContext16k.state}`);
+            console.log(`🤖 Day 23: Audio context state: ${completeVoiceAudioContext.state}`);
         }
         
         // Set recording flag immediately - don't wait for MediaRecorder events
@@ -2503,17 +2626,17 @@ async function startCompleteVoiceRecording() {
         
         // Store references for cleanup
         completeVoiceMediaRecorder = {
-            audioContext: audioContext16k,
+            audioContext: completeVoiceAudioContext,
             source: source16k,
-            processor,
+            completeVoiceScriptProcessor,
             stream: completeVoiceStream,
             start: () => {
                 console.log('🤖 Day 23: PCM audio processing started');
             },
             stop: () => {
-                processor.disconnect();
+                completeVoiceScriptProcessor.disconnect();
                 source16k.disconnect();
-                audioContext16k.close();
+                completeVoiceAudioContext.close();
                 completeVoiceStream.getTracks().forEach(track => track.stop());
             }
         };
@@ -2569,11 +2692,53 @@ async function startCompleteVoiceRecording() {
 function stopCompleteVoiceRecording() {
     console.log('🤖 Day 23: Stopping Complete Voice Agent recording...');
     
+    // Stop recording flag first
+    isCompleteVoiceRecording = false;
+    
+    // Stop media recorder
     if (completeVoiceMediaRecorder && completeVoiceMediaRecorder.state !== 'inactive') {
         completeVoiceMediaRecorder.stop();
     }
     
-    // Send stop command
+    // Clean up media stream and tracks
+    if (completeVoiceStream) {
+        completeVoiceStream.getTracks().forEach(track => {
+            track.stop();
+            console.log('🤖 Day 23: Stopped audio track:', track.label);
+        });
+        completeVoiceStream = null;
+    }
+    
+    // Clean up audio context
+    if (completeVoiceAudioContext) {
+        try {
+            if (completeVoiceAudioContext.state !== 'closed') {
+                completeVoiceAudioContext.close();
+                console.log('🤖 Day 23: Closed audio context');
+            }
+        } catch (error) {
+            console.warn('🤖 Day 23: Error closing audio context:', error);
+        }
+        completeVoiceAudioContext = null;
+    }
+    
+    // Clean up script processor
+    if (completeVoiceScriptProcessor) {
+        completeVoiceScriptProcessor.disconnect();
+        completeVoiceScriptProcessor = null;
+        console.log('🤖 Day 23: Disconnected script processor');
+    }
+    
+    // Reset media recorder
+    completeVoiceMediaRecorder = null;
+    
+    // Reset audio playback variables
+    completeVoiceAudioChunks = [];
+    completeVoiceChunksReceived = 0;
+    completeVoiceTotalPlaybackTime = 0;
+    completeVoicePlayheadTime = 0;
+    
+    // Send stop command to server
     if (completeVoiceWebSocket && completeVoiceWebSocket.readyState === WebSocket.OPEN) {
         completeVoiceWebSocket.send(JSON.stringify({
             type: 'stop_recording'
@@ -2584,7 +2749,7 @@ function stopCompleteVoiceRecording() {
     if (startRecordingBtn) startRecordingBtn.disabled = false;
     if (stopRecordingBtn) stopRecordingBtn.disabled = true;
     
-    isCompleteVoiceRecording = false;
+    console.log('🤖 Day 23: Complete Voice Agent recording stopped and resources cleaned up');
 }
 
 // Clear chat history
@@ -2603,9 +2768,7 @@ function clearCompleteVoiceChatHistory() {
     if (chatCount) {
         chatCount.textContent = '0 messages';
     }
-    if (conversationDisplay) {
-        conversationDisplay.innerHTML = '<div class="welcome-message">👋 Welcome! Click "Start Conversation" and begin speaking to interact with your AI voice agent.</div>';
-    }
+    // conversationDisplay removed - using single chat history only
 }
 
 // Set up all event listeners

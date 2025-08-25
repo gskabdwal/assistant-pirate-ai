@@ -93,10 +93,10 @@ async def stream_murf_tts_websocket(client_websocket: WebSocket, text: str, voic
                             "session_id": session_id
                         }))
                         first_chunk = False
-                        logger.debug(f"Day 23: Streamed audio chunk to client")
+                        # logger.debug(f"Day 23: Streamed audio chunk to client")
                     
                     if data.get("isFinalAudio") or data.get("final"):
-                        logger.info("Day 23: Final audio chunk received from Murf")
+                        # logger.info("Day 23: Final audio chunk received from Murf")
                         await client_websocket.send_text(json.dumps({
                             "type": "audio_final",
                             "session_id": session_id
@@ -489,7 +489,7 @@ async def audio_stream_websocket(websocket: WebSocket):
                         # Handle binary audio data
                         audio_data = message["bytes"]
                         audio_chunks.append(audio_data)
-                        logger.debug(f"Received audio chunk: {len(audio_data)} bytes")
+                        # logger.debug(f"Received audio chunk: {len(audio_data)} bytes")
                         
                         # Send acknowledgment (less frequent to avoid flooding)
                         if len(audio_chunks) % 10 == 0:  # Every 10th chunk
@@ -508,7 +508,7 @@ async def audio_stream_websocket(websocket: WebSocket):
                                         f.write(chunk)
                                 
                                 file_size = audio_file_path.stat().st_size
-                                logger.info(f"Saved audio stream to {audio_filename} ({file_size} bytes)")
+                                # logger.info(f"Saved audio stream to {audio_filename} ({file_size} bytes)")
                                 
                                 await websocket.send_text(f"Audio saved: {audio_filename} ({file_size} bytes)")
                             else:
@@ -540,7 +540,7 @@ async def audio_stream_websocket(websocket: WebSocket):
                 for chunk in audio_chunks:
                     f.write(chunk)
             file_size = audio_file_path.stat().st_size
-            logger.info(f"Saved final audio stream to {audio_filename} ({file_size} bytes)")
+            # logger.info(f"Saved final audio stream to {audio_filename} ({file_size} bytes)")
             
     except Exception as e:
         logger.error(f"Audio stream WebSocket error: {str(e)}")
@@ -749,11 +749,11 @@ async def llm_to_murf_websocket(websocket: WebSocket):
             }))
             
             # Print base64 audio to console (as per requirements)
-            if "audio" in tts_chunk:
-                print("\n" + "="*80)
-                print("MURF TTS BASE64 AUDIO (first 100 chars):")
-                print(tts_chunk["audio"][:100] + "...")
-                print("="*80 + "\n")
+            # if "audio" in tts_chunk:
+            #     print("\n" + "="*80)
+            #     print("MURF TTS BASE64 AUDIO (first 100 chars):")
+            #     print(tts_chunk["audio"][:100] + "...")
+            #     print("="*80 + "\n")
         
         logger.info("LLM to Murf streaming completed successfully")
         
@@ -780,7 +780,7 @@ async def audio_stream_base64_websocket(websocket: WebSocket):
     Enhanced to handle client disconnections and reconnections properly.
     """
     await websocket.accept()
-    logger.info(f"Day 22: Streaming audio WebSocket connection established from {websocket.client}")
+    # logger.info(f"Day 22: Streaming audio WebSocket connection established from {websocket.client}")
     
     # Get dependencies
     try:
@@ -822,7 +822,7 @@ async def audio_stream_base64_websocket(websocket: WebSocket):
                             }))
                             continue
                         
-                        logger.info(f"🎵 Day 22: Starting streaming audio playback for: {user_input[:50]}...")
+                        # logger.info(f"🎵 Day 22: Starting streaming audio playback for: {user_input[:50]}...")
                         
                         # Get chat history for context
                         chat_history = chat.get_chat_history(session_id, limit=10)
@@ -851,7 +851,7 @@ async def audio_stream_base64_websocket(websocket: WebSocket):
                         
                         # Day 22: Stream base64 audio chunks for seamless playback
                         if llm_response.strip():
-                            logger.info(f"🎵 Day 22: Streaming audio for seamless playback: {len(llm_response)} chars")
+                            # logger.info(f"🎵 Day 22: Streaming audio for seamless playback: {len(llm_response)} chars")
                             
                             await websocket.send_text(json.dumps({
                                 "type": "audio_stream_start",
@@ -880,7 +880,7 @@ async def audio_stream_base64_websocket(websocket: WebSocket):
                                         }))
                                         
                                         # Log streaming audio chunk
-                                        logger.info(f"🎵 Day 22: Sent streaming audio chunk {chunk_index} for playback ({len(tts_chunk['audio'])} chars) - Final: {is_final}")
+                                        # logger.info(f"🎵 Day 22: Sent streaming audio chunk {chunk_index} for playback ({len(tts_chunk['audio'])} chars) - Final: {is_final}")
                                         
                                         if is_final:
                                             final_chunk_sent = True
@@ -896,7 +896,7 @@ async def audio_stream_base64_websocket(websocket: WebSocket):
                             except Exception as tts_error:
                                 import traceback
                                 error_details = traceback.format_exc()
-                                logger.error(f"Day 22: Streaming audio error: {str(tts_error)}")
+                                # logger.error(f"Day 22: Streaming audio error: {str(tts_error)}")
                                 logger.error(f"Day 22: Error traceback: {error_details}")
                                 error_detail = str(tts_error) if str(tts_error) else "TTS streaming connection terminated unexpectedly"
                                 logger.error(f"TTS streaming failed with error: {error_detail}")
@@ -922,9 +922,10 @@ async def audio_stream_base64_websocket(websocket: WebSocket):
                 }))
                         
     except WebSocketDisconnect:
-        logger.info(f"Day 22: Streaming audio WebSocket client disconnected: {websocket.client}")
+        # logger.info(f"Day 22: Streaming audio WebSocket client disconnected: {websocket.client}")
+        pass
     except Exception as e:
-        logger.error(f"Day 22: Streaming audio WebSocket error: {str(e)}")
+        # logger.error(f"Day 22: Streaming audio WebSocket error: {str(e)}")
         try:
             await websocket.send_text(json.dumps({
                 "type": "error",
@@ -933,7 +934,7 @@ async def audio_stream_base64_websocket(websocket: WebSocket):
         except:
             pass
     finally:
-        logger.info(f"Day 22: Streaming audio WebSocket connection closed for {websocket.client}")
+        # logger.info(f"Day 22: Streaming audio WebSocket connection closed for {websocket.client}")
         try:
             await websocket.close()
         except:
@@ -1037,7 +1038,7 @@ async def transcribe_stream_websocket(websocket: WebSocket):
                     # Stream audio data to AssemblyAI
                     audio_data = message["bytes"]
                     streaming_client.stream(audio_data)
-                    logger.debug(f"Streamed {len(audio_data)} bytes to AssemblyAI")
+                    # logger.debug(f"Streamed {len(audio_data)} bytes to AssemblyAI")
                     
                 elif "text" in message:
                     text_message = message["text"]
@@ -1083,8 +1084,14 @@ async def transcribe_stream_websocket(websocket: WebSocket):
 async def send_turn_to_client(websocket: WebSocket, turn_event):
     """Send turn event to WebSocket client."""
     try:
+        # Send appropriate message type based on end_of_turn status
+        if turn_event.end_of_turn:
+            message_type = "final_transcript"
+        else:
+            message_type = "partial_transcript"
+            
         message = {
-            "type": "turn_transcript",
+            "type": message_type,
             "text": turn_event.transcript,
             "end_of_turn": turn_event.end_of_turn,
             "timestamp": time.time()
@@ -1098,6 +1105,7 @@ async def send_turn_to_client(websocket: WebSocket, turn_event):
             message["confidence"] = turn_event.confidence
             
         await websocket.send_text(json.dumps(message))
+        logger.info(f"Day 23: Sent {message_type}: '{turn_event.transcript}'")
     except Exception as e:
         logger.error(f"Error sending turn to client: {str(e)}")
 
@@ -1118,13 +1126,35 @@ async def send_error_to_client(websocket: WebSocket, error_message: str):
 async def complete_voice_agent_websocket(websocket: WebSocket):
     """
     Day 23: Complete Voice Agent WebSocket endpoint.
-    Integrates Day 17 (Real-time Transcription) and Day 22 (Streaming Audio Playback)
+    Integrates Day 17 (Real-time Transcription) and Day 22 (Streaming Audio Playbook)
     for a complete conversational AI experience.
     
     Pipeline: Recording → Real-time STT → LLM → Streaming TTS → Audio Playback
     """
+    # Accept with ping interval to prevent timeout
     await websocket.accept()
     logger.info(f"Day 23: Complete Voice Agent WebSocket connection established from {websocket.client}")
+    
+    # Start keepalive task to prevent ping timeout
+    keepalive_task = None
+    
+    async def keepalive():
+        """Send periodic ping to keep connection alive"""
+        try:
+            while True:
+                await asyncio.sleep(30)  # Send ping every 30 seconds
+                try:
+                    await websocket.ping()
+                    logger.debug("Day 23: Sent WebSocket ping")
+                except Exception as ping_error:
+                    logger.warning(f"Day 23: Ping failed: {ping_error}")
+                    break
+        except asyncio.CancelledError:
+            logger.info("Day 23: Keepalive task cancelled")
+        except Exception as e:
+            logger.error(f"Day 23: Keepalive error: {e}")
+    
+    keepalive_task = asyncio.create_task(keepalive())
     
     # Get dependencies
     try:
@@ -1146,7 +1176,7 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
         await websocket.close(code=1011, reason=str(e))
         return
     
-    # AssemblyAI streaming client
+    # AssemblyAI streaming client - will be created per session
     streaming_client = None
     main_loop = asyncio.get_running_loop()
     
@@ -1156,22 +1186,11 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
     is_recording = False
     is_processing = False
     accumulated_transcript = ""
+    session_id = None
+    streaming_client = None
+    last_final_transcript = ""
+    final_transcript_timer = None
     
-    # AssemblyAI StreamingClient setup
-    try:
-        logger.info("Day 23: Creating StreamingClient...")
-        streaming_client = StreamingClient(
-            StreamingClientOptions(
-                api_key=Config.ASSEMBLYAI_API_KEY,
-                api_host="streaming.assemblyai.com"
-            )
-        )
-        logger.info("Day 23: StreamingClient created successfully")
-    except Exception as e:
-        logger.error(f"Day 23: Failed to create StreamingClient: {str(e)}")
-        await websocket.close(code=1011, reason=f"StreamingClient initialization failed: {str(e)}")
-        return
-
     def on_begin(client, event: BeginEvent):
         logger.info(f"AssemblyAI session started: {event.id}")
         print(f"Day 23: TRANSCRIPTION SESSION STARTED: {event.id}")
@@ -1198,11 +1217,18 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
         
         if event.end_of_turn:
             if event.transcript.strip():
-                # Final transcript with content - process with LLM and TTS
-                accumulated_transcript = event.transcript
-                print(f"Day 23: PROCESSING FINAL TRANSCRIPT: '{event.transcript}'")
-                asyncio.run_coroutine_threadsafe(
-                    process_with_llm_and_tts(event.transcript),
+                # Final transcript received - wait for potential refinement
+                nonlocal last_final_transcript, final_transcript_timer
+                last_final_transcript = event.transcript
+                print(f"Day 23: FINAL TRANSCRIPT RECEIVED: '{event.transcript}' - waiting for refinement...")
+                
+                # Cancel previous timer if exists
+                if final_transcript_timer:
+                    final_transcript_timer.cancel()
+                
+                # Set timer to process transcript after 1 second (wait for refinement)
+                final_transcript_timer = asyncio.run_coroutine_threadsafe(
+                    process_refined_transcript(event.transcript, websocket),
                     main_loop
                 )
             else:
@@ -1232,6 +1258,30 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
         logger.info(f"Day 23: AssemblyAI session terminated: {event.audio_duration_seconds}s")
         print(f"Day 23: SESSION ENDED: {event.audio_duration_seconds}s processed")
     
+    async def process_refined_transcript(transcript: str, websocket: WebSocket):
+        """Wait for potential transcript refinement, then process the final version."""
+        try:
+            # Wait 1 second for potential refinement
+            await asyncio.sleep(1.0)
+            
+            # Use the latest transcript (may have been updated by newer final transcripts)
+            final_transcript = last_final_transcript
+            print(f"Day 23: PROCESSING REFINED FINAL TRANSCRIPT: '{final_transcript}'")
+            
+            # Send the refined transcript to UI for chat history
+            await websocket.send_text(json.dumps({
+                "type": "refined_final_transcript",
+                "text": final_transcript
+            }))
+            
+            # Process with LLM and TTS
+            await process_with_llm_and_tts(final_transcript)
+            
+        except asyncio.CancelledError:
+            print(f"Day 23: Transcript processing cancelled - newer transcript received")
+        except Exception as e:
+            logger.error(f"Error processing refined transcript: {str(e)}")
+    
     async def send_turn_to_client(websocket: WebSocket, turn_event: TurnEvent):
         """Send turn event to WebSocket client - adapted from Day 17."""
         try:
@@ -1256,18 +1306,28 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
         except Exception as e:
             logger.error(f"Day 23: Error sending turn to client: {str(e)}")
     
-    # Set up event handlers
-    try:
-        logger.info("Day 23: Setting up StreamingClient event handlers...")
-        streaming_client.on(StreamingEvents.Begin, on_begin)
-        streaming_client.on(StreamingEvents.Turn, on_turn)
-        streaming_client.on(StreamingEvents.Error, on_error)
-        streaming_client.on(StreamingEvents.Termination, on_terminated)
-        logger.info("Day 23: Event handlers set up successfully")
-    except Exception as e:
-        logger.error(f"Day 23: Failed to set up event handlers: {str(e)}")
-        await websocket.close(code=1011, reason=f"Event handler setup failed: {str(e)}")
-        return
+    def create_streaming_client():
+        """Create a new StreamingClient instance for each recording session."""
+        try:
+            logger.info("Day 23: Creating new StreamingClient...")
+            client = StreamingClient(
+                StreamingClientOptions(
+                    api_key=Config.ASSEMBLYAI_API_KEY,
+                    api_host="streaming.assemblyai.com"
+                )
+            )
+            
+            # Set up event handlers for the new client
+            client.on(StreamingEvents.Begin, on_begin)
+            client.on(StreamingEvents.Turn, on_turn)
+            client.on(StreamingEvents.Error, on_error)
+            client.on(StreamingEvents.Termination, on_terminated)
+            
+            logger.info("Day 23: New StreamingClient created successfully")
+            return client
+        except Exception as e:
+            logger.error(f"Day 23: Failed to create StreamingClient: {str(e)}")
+            raise e
     
     async def process_with_llm_and_tts(transcript: str):
         """Process transcript with LLM and stream TTS response."""
@@ -1343,7 +1403,7 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
                         "chunk_index": chunk_index
                     }))
                     
-                    logger.info(f"Day 23: Sent audio chunk {chunk_index} (Final: {is_final})")
+                    # logger.info(f"Day 23: Sent audio chunk {chunk_index} (Final: {is_final})")
             
             # Send TTS complete
             await websocket.send_text(json.dumps({
@@ -1395,6 +1455,17 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
                             current_session_id = data.get("session_id", str(uuid.uuid4()))
                             current_voice_id = data.get("voice_id", "en-US-natalie")
                             
+                            logger.info(f"Day 23: Starting recording for session {current_session_id}")
+                            
+                            # Clean up any existing StreamingClient before creating new one
+                            if streaming_client is not None:
+                                try:
+                                    logger.info("Day 23: Cleaning up previous StreamingClient")
+                                    streaming_client.disconnect(terminate=True)
+                                    streaming_client = None
+                                except Exception as cleanup_error:
+                                    logger.warning(f"Day 23: Error cleaning up previous StreamingClient: {cleanup_error}")
+                            
                             # Send pipeline status update
                             await websocket.send_text(json.dumps({
                                 "type": "pipeline_status",
@@ -1402,23 +1473,31 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
                                 "status": "active"
                             }))
                             
-                            # Start AssemblyAI StreamingClient
-                            logger.info("Day 23: Starting AssemblyAI StreamingClient")
-                            streaming_client.connect(
-                                StreamingParameters(
-                                    sample_rate=16000,
-                                    format_turns=True
+                            # Create new StreamingClient for this session
+                            try:
+                                streaming_client = create_streaming_client()
+                                logger.info("Day 23: Starting AssemblyAI StreamingClient")
+                                streaming_client.connect(
+                                    StreamingParameters(
+                                        sample_rate=16000,
+                                        format_turns=True
+                                    )
                                 )
-                            )
-                            
-                            is_recording = True
-                            accumulated_transcript = ""
-                            
-                            await websocket.send_text(json.dumps({
-                                "type": "recording_started",
-                                "message": "Recording started",
-                                "session_id": current_session_id
-                            }))
+                                
+                                is_recording = True
+                                accumulated_transcript = ""
+                                
+                                await websocket.send_text(json.dumps({
+                                    "type": "recording_started",
+                                    "message": "Recording started",
+                                    "session_id": current_session_id
+                                }))
+                            except Exception as e:
+                                logger.error(f"Day 23: Failed to start recording: {str(e)}")
+                                await websocket.send_text(json.dumps({
+                                    "type": "error",
+                                    "message": f"Failed to start recording: {str(e)}"
+                                }))
                             
                         elif message_type == "stop_recording":
                             logger.info("Day 23: Stopping AssemblyAI StreamingClient")
@@ -1438,72 +1517,9 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
                                 "message": "Recording stopped"
                             }))
                             
-                            if accumulated_transcript.strip():
-                                logger.info(f"Day 23: Processing transcript: {accumulated_transcript}")
-                                
-                                # Update pipeline status
-                                await websocket.send_text(json.dumps({
-                                    "type": "pipeline_status",
-                                    "step": "stt",
-                                    "status": "complete"
-                                }))
-                                
-                                await websocket.send_text(json.dumps({
-                                    "type": "pipeline_status",
-                                    "step": "llm",
-                                    "status": "processing"
-                                }))
-                                
-                                # Get LLM response
-                                try:
-                                    full_response = ""
-                                    async for chunk in llm.stream_response(accumulated_transcript):
-                                        full_response += chunk
-                                        # Send LLM chunk to frontend
-                                        await websocket.send_text(json.dumps({
-                                            "type": "llm_chunk",
-                                            "text": chunk,
-                                            "is_complete": False
-                                        }))
-                                    
-                                    # Send complete LLM response
-                                    await websocket.send_text(json.dumps({
-                                        "type": "llm_complete",
-                                        "text": full_response
-                                    }))
-                                    
-                                    await websocket.send_text(json.dumps({
-                                        "type": "pipeline_status",
-                                        "step": "llm",
-                                        "status": "complete"
-                                    }))
-                                    
-                                    await websocket.send_text(json.dumps({
-                                        "type": "pipeline_status",
-                                        "step": "tts",
-                                        "status": "generating"
-                                    }))
-                                    
-                                    # Stream TTS audio using Murf WebSocket
-                                    await stream_murf_tts_websocket(websocket, full_response, current_voice_id, current_session_id)
-                                    
-                                    await websocket.send_text(json.dumps({
-                                        "type": "pipeline_status",
-                                        "step": "tts",
-                                        "status": "complete"
-                                    }))
-                                    
-                                    await websocket.send_text(json.dumps({
-                                        "type": "audio_complete",
-                                        "message": "Audio generation complete"
-                                    }))
-                                    
-                                except Exception as llm_error:
-                                    logger.error(f"Day 23: LLM/TTS error: {str(llm_error)}")
-                                    await websocket.send_text(json.dumps({
-                                        "type": "error",
-                                        "message": f"LLM/TTS error: {str(llm_error)}"
-                                    }))
+                            # Note: LLM processing is handled by process_with_llm_and_tts() 
+                            # function called from AssemblyAI turn event handler.
+                            # No need for duplicate processing here.
                             
                         elif message_type == "clear_chat":
                             session_id = data.get("session_id", "default")
@@ -1532,18 +1548,18 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
                     # Stream audio data to AssemblyAI StreamingClient
                     audio_data = message["bytes"]
                     print(f"Day 23: RECEIVED AUDIO CHUNK: {len(audio_data)} bytes")
-                    logger.info(f"Day 23: Received audio chunk: {len(audio_data)} bytes")
+                    # logger.info(f"Day 23: Received audio chunk: {len(audio_data)} bytes")
                     
                     # Check if audio contains actual data (not just silence)
                     non_zero_bytes = sum(1 for b in audio_data if b != 0)
                     silence_ratio = (len(audio_data) - non_zero_bytes) / len(audio_data)
                     print(f"Day 23: AUDIO ANALYSIS - Non-zero bytes: {non_zero_bytes}/{len(audio_data)} ({(1-silence_ratio)*100:.1f}% content)")
-                    logger.info(f"Day 23: Audio analysis - Non-zero bytes: {non_zero_bytes}/{len(audio_data)} ({(1-silence_ratio)*100:.1f}% content)")
+                    # logger.info(f"Day 23: Audio analysis - Non-zero bytes: {non_zero_bytes}/{len(audio_data)} ({(1-silence_ratio)*100:.1f}% content)")
                     
                     if non_zero_bytes > 0:
                         print(f"Day 23: STREAMING TO ASSEMBLYAI - {len(audio_data)} bytes")
                         streaming_client.stream(audio_data)
-                        logger.debug(f"Day 23: Streamed {len(audio_data)} bytes to AssemblyAI")
+                        # logger.debug(f"Day 23: Streamed {len(audio_data)} bytes to AssemblyAI")
                     else:
                         print(f"Day 23: SKIPPING SILENT CHUNK - all zeros")
     
@@ -1559,9 +1575,18 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
         except:
             pass
     finally:
+        # Cancel keepalive task
+        if keepalive_task and not keepalive_task.done():
+            keepalive_task.cancel()
+            try:
+                await keepalive_task
+            except asyncio.CancelledError:
+                pass
+        
         # Clean up AssemblyAI connection
         try:
-            streaming_client.disconnect(terminate=True)
+            if streaming_client:
+                streaming_client.disconnect(terminate=True)
         except:
             pass
         
