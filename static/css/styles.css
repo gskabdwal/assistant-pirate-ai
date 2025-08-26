@@ -81,6 +81,12 @@ body {
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
 }
 
+.top-container{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+}
+
 .left-left{
     min-width: 25%;
     margin-left: 2%;
@@ -1856,4 +1862,117 @@ footer {
 .navbar {
     background: linear-gradient(135deg, #1a1a2e 0%, #8B4513 100%);
     border-bottom: 3px solid #FFD700;
+}
+
+/* Day 25: Special Skills Showcase */
+.skills-showcase {
+    background: linear-gradient(135deg, #2C1810 0%, #8B4513 50%, #D2691E 100%);
+    border-radius: 20px;
+    padding: 40px;
+    margin-bottom: 30px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    border: 3px solid #FFD700;
+}
+
+.skills-showcase .hero-section {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.skills-showcase .hero-title {
+    color: #FFD700;
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 15px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.skills-showcase .hero-subtitle {
+    color: #F5DEB3;
+    font-size: 1.3rem;
+    font-weight: 500;
+    margin-bottom: 20px;
+}
+
+.skills-showcase .pirate-motto {
+    color: #FFD700;
+    font-style: italic;
+    font-weight: 600;
+    font-size: 1.1rem;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.skills-demo h3 {
+    color: #FFD700;
+    font-size: 1.8rem;
+    text-align: center;
+    margin-bottom: 30px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.skills-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 25px;
+    margin-bottom: 20px;
+}
+
+.skill-card {
+    background: rgba(139, 69, 19, 0.3);
+    border: 2px solid #CD853F;
+    border-radius: 15px;
+    padding: 25px;
+    text-align: center;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.skill-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(255, 215, 0, 0.3);
+    border-color: #FFD700;
+}
+
+.skill-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    display: block;
+}
+
+.skill-card h4 {
+    color: #FFD700;
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.skill-card p {
+    color: #F5DEB3;
+    font-size: 1rem;
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+.skill-examples {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.example {
+    background: rgba(255, 215, 0, 0.1);
+    color: #FFD700;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-style: italic;
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    transition: all 0.2s ease;
+}
+
+.example:hover {
+    background: rgba(255, 215, 0, 0.2);
+    border-color: #FFD700;
+    transform: scale(1.02);
 }

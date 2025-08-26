@@ -21,6 +21,7 @@ from app.services.stt_service import STTService
 from app.services.llm_service import LLMService  
 from app.services.tts_service import TTSService
 from app.services.chat_service import ChatService
+from app.services.skills.skill_manager import SkillManager
 from app.config import Config
 
 # AssemblyAI Streaming imports (v3 Universal-Streaming)
@@ -130,6 +131,7 @@ stt_service = None
 tts_service = None
 llm_service = None
 chat_service = ChatService()
+skill_manager = None
 
 # Initialize services with error handling
 try:
@@ -144,10 +146,18 @@ try:
         logger.info("TTS service initialized successfully")
     else:
         logger.warning("TTS service not initialized - missing API key")
+    
+    # Initialize skill manager first
+    skill_manager = SkillManager(
+        tavily_api_key=Config.TAVILY_API_KEY,
+        weather_api_key=Config.OPENWEATHER_API_KEY,
+        news_api_key=Config.NEWS_API_KEY
+    )
+    logger.info("🏴‍☠️ Skill Manager initialized")
         
     if Config.GEMINI_API_KEY:
-        llm_service = LLMService(Config.GEMINI_API_KEY)
-        logger.info("LLM service initialized successfully")
+        llm_service = LLMService(Config.GEMINI_API_KEY, skill_manager=skill_manager)
+        logger.info("LLM service initialized successfully with special skills")
     else:
         logger.warning("LLM service not initialized - missing API key")
         
@@ -181,6 +191,12 @@ def get_chat_service() -> ChatService:
     """Get chat service dependency."""
     return chat_service
 
+
+def get_skill_manager() -> SkillManager:
+    """Get skill manager dependency."""
+    if not skill_manager:
+        raise HTTPException(status_code=503, detail="Skill manager not available")
+    return skill_manager
 
 # API Routes
 @app.get("/", response_class=HTMLResponse)

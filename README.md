@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 24, we've completed the **Complete Voice Agent with Captain Blackbeard Persona** - a fully integrated conversational AI system featuring a swashbuckling pirate character that handles the entire pipeline: voice recording → real-time transcription → AI processing → streaming audio responses. The implementation provides seamless voice interaction with pirate-themed UI, real-time pipeline visualization, and streaming audio playback with nautical personality.
+This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 25, we've completed the **Enhanced Voice Agent with Special Skills** - a fully integrated conversational AI system featuring Captain Blackbeard's pirate persona enhanced with three powerful special skills: Web Search, Weather Forecasting, and News Headlines. The implementation provides seamless voice interaction with pirate-themed UI, real-time pipeline visualization, streaming audio playback, and intelligent function calling capabilities.
 
 ### Project Structure
 
@@ -18,7 +18,14 @@ This project evolves over 30 days to build a fully functional AI Voice Agent. As
 │       ├── stt_service.py  # Speech-to-Text service (AssemblyAI)
 │       ├── tts_service.py  # Text-to-Speech service (Murf AI)
 │       ├── llm_service.py  # LLM service (Google Gemini)
-│       └── chat_service.py # Chat history management
+│       ├── chat_service.py # Chat history management
+│       └── skills/         # Special Skills for enhanced capabilities
+│           ├── __init__.py         # Skills package initialization
+│           ├── base_skill.py       # Base class for all skills
+│           ├── skill_manager.py    # Manages and coordinates all skills
+│           ├── web_search_skill.py # Web search using Tavily API
+│           ├── weather_skill.py    # Weather forecasts using OpenWeatherMap
+│           └── news_skill.py       # News headlines using NewsAPI
 ├── requirements.txt         # Python dependencies
 ├── static/                 # Static files
 │   ├── css/
@@ -42,9 +49,15 @@ This project evolves over 30 days to build a fully functional AI Voice Agent. As
 
    Create a `.env` file in the project root with your API keys:
    ```
+   # Core Voice Agent APIs
    MURF_API_KEY=your_murf_api_key_here
    ASSEMBLYAI_API_KEY=your_assemblyai_api_key_here
    GEMINI_API_KEY=your_gemini_api_key_here
+   
+   # Special Skills APIs (Day 25)
+   TAVILY_API_KEY=your_tavily_api_key_here
+   OPENWEATHER_API_KEY=your_openweather_api_key_here
+   NEWS_API_KEY=your_news_api_key_here
    ```
 
 3. **Run the server**
@@ -220,6 +233,68 @@ streamed_audio_{unique_session_id}_{timestamp}.wav
 Example: `streamed_audio_7d47a72f-8dc0-4163-a21a-914fb6e3de15_1755437664.wav`
 
 ### Features
+
+#### Day 25: Special Skills - Web Search, Weather & News 🛠️
+
+**Enhanced AI Capabilities with Function Calling:**
+- **Web Search Skill**: Real-time internet search using Tavily API for current information, news, and answers
+- **Weather Forecast Skill**: Live weather data using OpenWeatherMap API for any location worldwide
+- **News Headlines Skill**: Latest news by category or topic using NewsAPI for breaking news and updates
+- **Gemini Function Calling**: Proper integration with Google Gemini's function calling system using FunctionDeclaration objects
+- **Intelligent Skill Selection**: AI automatically chooses appropriate skills based on user queries
+- **Pirate-Themed Responses**: All skills maintain Captain Blackbeard's swashbuckling personality
+
+**Technical Implementation:**
+- **Skill Manager**: Centralized management of all special skills with proper initialization and execution
+- **Base Skill Architecture**: Extensible base class system for easy addition of new skills
+- **Function Definitions**: Proper Gemini-compatible function schemas with parameter validation
+- **Error Handling**: Comprehensive error handling with pirate-themed fallback messages
+- **Parameter Conversion**: Automatic handling of float-to-integer conversion for API compatibility
+- **Null Safety**: Robust handling of None values and empty responses from external APIs
+
+**Available Skills:**
+1. **🔍 Web Search** (`search_web`)
+   - Search the internet for current information
+   - Example: "What's happening in AI today?", "Search for Python tutorials"
+   - Returns formatted search results with titles, descriptions, and URLs
+
+2. **🌤️ Weather Forecast** (`get_weather`)
+   - Get current weather conditions for any location
+   - Example: "What's the weather in London?", "Will it rain in New York?"
+   - Returns temperature, conditions, humidity, and wind information
+
+3. **📰 News Headlines** (`get_news`)
+   - Get latest news by category or search specific topics
+   - Example: "Show me tech news", "What's the latest business headlines?"
+   - Returns formatted news articles with sources, publication dates, and links
+
+**Function Calling Integration:**
+- Proper `FunctionDeclaration` objects for Gemini compatibility
+- Automatic parameter type conversion (float to integer)
+- Comprehensive error handling and logging
+- Pirate persona maintained across all skill responses
+- Real-time execution with streaming support
+
+**Debugging and Testing:**
+- Comprehensive test scripts for individual skill validation
+- Debug utilities for function calling troubleshooting
+- Detailed logging for skill execution and error tracking
+- Unicode encoding fixes for Windows compatibility
+
+**Example Interactions:**
+- "Hi Captain, search for Python tutorials" → Web search with formatted results
+- "What's the weather like in Tokyo?" → Current weather conditions with pirate flair
+- "Show me the latest technology news" → Recent tech headlines with sources
+
+**Pipeline Flow with Skills:**
+1. **🎤 Voice Input** → User speaks query
+2. **📝 Transcription** → AssemblyAI converts speech to text
+3. **🧠 AI Processing** → Gemini analyzes query and selects appropriate skill
+4. **🛠️ Skill Execution** → Web search, weather, or news API called automatically
+5. **🏴‍☠️ Pirate Response** → Results formatted with Captain Blackbeard's personality
+6. **🔊 Voice Output** → Murf TTS converts response to speech
+
+**Status**: All special skills fully functional with proper Gemini function calling integration and comprehensive error handling.
 
 #### Day 23: Complete Voice Agent - Full Pipeline Integration 🤖
 
@@ -676,20 +751,28 @@ For text-only LLM queries, you can still use the original format via the web int
 
 Create a `.env` file in the project root with your API keys:
 ```
-# Required for TTS functionality
+# Core Voice Agent APIs
 MURF_API_KEY=your_murf_api_key_here
-
-# Required for speech-to-text functionality
 ASSEMBLYAI_API_KEY=your_assemblyai_api_key_here
-
-# Required for LLM functionality (Day 8)
 GEMINI_API_KEY=your_gemini_api_key_here
+
+# Special Skills APIs (Day 25)
+TAVILY_API_KEY=your_tavily_api_key_here
+OPENWEATHER_API_KEY=your_openweather_api_key_here
+NEWS_API_KEY=your_news_api_key_here
 ```
 
 **Note:** Make sure to keep your API keys secure and never commit them to version control.
+
+**Core APIs:**
 - Get your Murf API key from [Murf.ai](https://www.murf.ai/)
 - Get your AssemblyAI API key from [AssemblyAI](https://www.assemblyai.com/)
 - Get your Gemini API key from [Google AI Studio](https://ai.google.dev/gemini-api/docs/quickstart)
+
+**Special Skills APIs (Day 25):**
+- Get your Tavily API key from [Tavily](https://tavily.com/) for web search functionality
+- Get your OpenWeatherMap API key from [OpenWeatherMap](https://openweathermap.org/api) for weather data
+- Get your NewsAPI key from [NewsAPI](https://newsapi.org/) for news headlines
 
 ### How to Use the AI Voice Agent (Day 9)
 

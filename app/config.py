@@ -3,6 +3,7 @@ Configuration settings for the AI Voice Agent.
 """
 import os
 import logging
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -17,6 +18,11 @@ class Config:
     MURF_API_KEY = os.getenv("MURF_API_KEY")
     ASSEMBLYAI_API_KEY = os.getenv("ASSEMBLYAI_API_KEY")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    
+    # Special Skills API Keys (Day 25)
+    TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+    OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+    NEWS_API_KEY = os.getenv("NEWS_API_KEY")
     
     # Application settings
     APP_TITLE = "AI Voice Agent"
@@ -59,6 +65,20 @@ class Config:
         if missing_keys:
             logging.warning(f"Missing API keys: {', '.join(missing_keys)}")
             logging.warning("Some functionality may not work properly.")
+        
+        # Check special skills API keys (optional)
+        skill_keys = []
+        if cls.TAVILY_API_KEY:
+            skill_keys.append("Web Search")
+        if cls.OPENWEATHER_API_KEY:
+            skill_keys.append("Weather")
+        if cls.NEWS_API_KEY:
+            skill_keys.append("News")
+        
+        if skill_keys:
+            logging.info(f"Special skills enabled: {', '.join(skill_keys)}")
+        else:
+            logging.info("No special skills API keys configured")
     
     @classmethod
     def setup_directories(cls) -> None:
@@ -68,14 +88,39 @@ class Config:
     
     @classmethod
     def setup_logging(cls) -> None:
-        """Setup application logging."""
+        """Setup application logging with Windows Unicode support."""
+        # Configure handlers with UTF-8 encoding for Windows
+        handlers = []
+        
+        # Console handler with UTF-8 encoding
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(getattr(logging, cls.LOG_LEVEL))
+        console_handler.setFormatter(logging.Formatter(cls.LOG_FORMAT))
+        
+        # Set UTF-8 encoding for Windows console
+        if sys.platform.startswith('win'):
+            try:
+                console_handler.stream.reconfigure(encoding='utf-8')
+            except AttributeError:
+                # Fallback for older Python versions
+                pass
+        
+        handlers.append(console_handler)
+        
+        # File handler with UTF-8 encoding
+        try:
+            file_handler = logging.FileHandler(cls.BASE_DIR / "app.log", encoding='utf-8')
+            file_handler.setLevel(getattr(logging, cls.LOG_LEVEL))
+            file_handler.setFormatter(logging.Formatter(cls.LOG_FORMAT))
+            handlers.append(file_handler)
+        except Exception:
+            logging.warning("Could not create file handler")
+        
         logging.basicConfig(
             level=getattr(logging, cls.LOG_LEVEL),
             format=cls.LOG_FORMAT,
-            handlers=[
-                logging.StreamHandler(),
-                logging.FileHandler(cls.BASE_DIR / "app.log")
-            ]
+            handlers=handlers,
+            force=True
         )
         
         # Set specific loggers
