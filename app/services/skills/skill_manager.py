@@ -7,6 +7,7 @@ from .base_skill import BaseSkill
 from .web_search_skill import WebSearchSkill
 from .weather_skill import WeatherSkill
 from .news_skill import NewsSkill
+from .translation_skill import TranslationSkill
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 class SkillManager:
     """Manages all special skills for the voice agent."""
     
-    def __init__(self, tavily_api_key: str = None, weather_api_key: str = None, news_api_key: str = None):
+    def __init__(self, tavily_api_key: str = None, weather_api_key: str = None, news_api_key: str = None, translate_api_key: str = None):
         """
         Initialize skill manager with API keys.
         
@@ -22,6 +23,7 @@ class SkillManager:
             tavily_api_key: Tavily API key for web search
             weather_api_key: OpenWeatherMap API key
             news_api_key: NewsAPI key
+            translate_api_key: Google Cloud API key for translation
         """
         self.skills: Dict[str, BaseSkill] = {}
         
@@ -46,6 +48,13 @@ class SkillManager:
                 logger.info("📰 News skill enabled")
             except Exception as e:
                 logger.error(f"Failed to initialize news skill: {e}")
+        
+        if translate_api_key:
+            try:
+                self.skills["translate_text"] = TranslationSkill(translate_api_key)
+                logger.info("🌍 Translation skill enabled")
+            except Exception as e:
+                logger.error(f"Failed to initialize translation skill: {e}")
         
         logger.info(f"🏴‍☠️ Skill Manager initialized with {len(self.skills)} skills")
     

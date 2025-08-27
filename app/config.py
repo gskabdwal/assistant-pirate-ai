@@ -24,6 +24,9 @@ class Config:
     OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
     NEWS_API_KEY = os.getenv("NEWS_API_KEY")
     
+    # Translation Skill API Key (Day 26)
+    GOOGLE_TRANSLATE_API_KEY = os.getenv("GOOGLE_TRANSLATE_API_KEY")
+    
     # Application settings
     APP_TITLE = "AI Voice Agent"
     APP_VERSION = "1.0.0"
@@ -74,6 +77,8 @@ class Config:
             skill_keys.append("Weather")
         if cls.NEWS_API_KEY:
             skill_keys.append("News")
+        if cls.GOOGLE_TRANSLATE_API_KEY:
+            skill_keys.append("Translation")
         
         if skill_keys:
             logging.info(f"Special skills enabled: {', '.join(skill_keys)}")

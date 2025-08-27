@@ -151,7 +151,8 @@ try:
     skill_manager = SkillManager(
         tavily_api_key=Config.TAVILY_API_KEY,
         weather_api_key=Config.OPENWEATHER_API_KEY,
-        news_api_key=Config.NEWS_API_KEY
+        news_api_key=Config.NEWS_API_KEY,
+        translate_api_key=Config.GOOGLE_TRANSLATE_API_KEY
     )
     logger.info("🏴‍☠️ Skill Manager initialized")
         

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 25, we've completed the **Enhanced Voice Agent with Special Skills** - a fully integrated conversational AI system featuring Captain Blackbeard's pirate persona enhanced with three powerful special skills: Web Search, Weather Forecasting, and News Headlines. The implementation provides seamless voice interaction with pirate-themed UI, real-time pipeline visualization, streaming audio playback, and intelligent function calling capabilities.
+This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 26, we've completed the **Enhanced Voice Agent with Translation Skills** - a fully integrated conversational AI system featuring Captain Blackbeard's pirate persona enhanced with four powerful special skills: Web Search, Weather Forecasting, News Headlines, and Multi-Language Translation. The implementation provides seamless voice interaction with pirate-themed UI, real-time pipeline visualization, streaming audio playback, and intelligent function calling capabilities including automatic language detection and translation between 100+ languages.
 
 ### Project Structure
 
@@ -25,7 +25,8 @@ This project evolves over 30 days to build a fully functional AI Voice Agent. As
 │           ├── skill_manager.py    # Manages and coordinates all skills
 │           ├── web_search_skill.py # Web search using Tavily API
 │           ├── weather_skill.py    # Weather forecasts using OpenWeatherMap
-│           └── news_skill.py       # News headlines using NewsAPI
+│           ├── news_skill.py       # News headlines using NewsAPI
+│           └── translation_skill.py # Multi-language translation using Google Cloud
 ├── requirements.txt         # Python dependencies
 ├── static/                 # Static files
 │   ├── css/
@@ -58,6 +59,9 @@ This project evolves over 30 days to build a fully functional AI Voice Agent. As
    TAVILY_API_KEY=your_tavily_api_key_here
    OPENWEATHER_API_KEY=your_openweather_api_key_here
    NEWS_API_KEY=your_news_api_key_here
+   
+   # Translation Skill API Key (Day 26)
+   GOOGLE_TRANSLATE_API_KEY=your_google_cloud_api_key_here
    ```
 
 3. **Run the server**
@@ -233,6 +237,28 @@ streamed_audio_{unique_session_id}_{timestamp}.wav
 Example: `streamed_audio_7d47a72f-8dc0-4163-a21a-914fb6e3de15_1755437664.wav`
 
 ### Features
+
+#### Day 26: Translation Skill - Multi-Language Support 🌍
+
+**New Translation Capabilities:**
+- **Translation Skill**: Translate text between any languages using Google Cloud Translate API
+- **Auto Language Detection**: Automatically detects source language when not specified
+- **100+ Languages**: Supports all major world languages with proper language codes
+- **Pirate Integration**: Translation responses maintain Captain Blackbeard's swashbuckling personality
+- **Function Calling**: Seamlessly integrated with Gemini's function calling system
+
+**Voice Commands:**
+- "Translate 'Hello' to Spanish"
+- "What does 'Bonjour' mean in English?"
+- "Convert this text to German: How are you?"
+- "Translate 'Hola mundo' to Japanese"
+
+**Technical Features:**
+- **Google Cloud Integration**: Uses Google Cloud Translate API for accurate translations
+- **Language Code Mapping**: Comprehensive mapping of language names to ISO codes
+- **Error Handling**: Graceful handling of unsupported languages and API errors
+- **Async Processing**: Non-blocking translation requests with proper error recovery
+- **Pirate Responses**: All translations formatted with nautical flair and treasure metaphors
 
 #### Day 25: Special Skills - Web Search, Weather & News 🛠️
 
@@ -760,6 +786,9 @@ GEMINI_API_KEY=your_gemini_api_key_here
 TAVILY_API_KEY=your_tavily_api_key_here
 OPENWEATHER_API_KEY=your_openweather_api_key_here
 NEWS_API_KEY=your_news_api_key_here
+
+# Translation Skill API Key (Day 26)
+GOOGLE_TRANSLATE_API_KEY=your_google_cloud_api_key_here
 ```
 
 **Note:** Make sure to keep your API keys secure and never commit them to version control.
@@ -773,6 +802,11 @@ NEWS_API_KEY=your_news_api_key_here
 - Get your Tavily API key from [Tavily](https://tavily.com/) for web search functionality
 - Get your OpenWeatherMap API key from [OpenWeatherMap](https://openweathermap.org/api) for weather data
 - Get your NewsAPI key from [NewsAPI](https://newsapi.org/) for news headlines
+
+**Translation Skill API (Day 26):**
+- Get your Google Cloud API key from [Google Cloud Console](https://console.cloud.google.com/)
+- Enable the Cloud Translation API in your Google Cloud project
+- Create credentials and download the API key for translation functionality
 
 ### How to Use the AI Voice Agent (Day 9)
 
