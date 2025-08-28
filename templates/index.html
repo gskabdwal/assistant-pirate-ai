@@ -4,214 +4,477 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🏴‍☠️ Captain Blackbeard's Voice Agent</title>
+    <title>🎙️ AI Voice Agent - Day 27</title>
     <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
 <body>
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="logo">🏴‍☠️ Captain Blackbeard's AI</div>
-            <ul class="nav-links">
-                <li><a href="#" class="active">Home</a></li>
-                <li><a href="#">Documentation</a></li>
-                <li><a href="#">About</a></li>
-            </ul>
+    <!-- API Configuration Sidebar -->
+    <div id="configSidebar" class="config-sidebar">
+        <div class="config-header">
+            <h3><i class="fas fa-cog"></i> API Configuration</h3>
+            <button id="closeSidebar" class="close-btn"><i class="fas fa-times"></i></button>
         </div>
-    </nav>
+        <div class="config-content">
+            <div class="config-section">
+                <h4><i class="fas fa-microphone"></i> Core Services</h4>
+                <div class="api-input-group">
+                    <label for="assemblyaiKey">AssemblyAI API Key</label>
+                    <input type="password" id="assemblyaiKey" placeholder="Enter AssemblyAI API key">
+                    <span class="input-status" id="assemblyaiStatus"></span>
+                </div>
+                <div class="api-input-group">
+                    <label for="geminiKey">Google Gemini API Key</label>
+                    <input type="password" id="geminiKey" placeholder="Enter Gemini API key">
+                    <span class="input-status" id="geminiStatus"></span>
+                </div>
+                <div class="api-input-group">
+                    <label for="murfKey">Murf AI API Key</label>
+                    <input type="password" id="murfKey" placeholder="Enter Murf API key">
+                    <span class="input-status" id="murfStatus"></span>
+                </div>
+            </div>
+            
+            <div class="config-section">
+                <h4><i class="fas fa-star"></i> Special Skills</h4>
+                <div class="api-input-group">
+                    <label for="tavilyKey">Tavily Web Search API Key</label>
+                    <input type="password" id="tavilyKey" placeholder="Enter Tavily API key">
+                    <span class="input-status" id="tavilyStatus"></span>
+                </div>
+                <div class="api-input-group">
+                    <label for="weatherKey">OpenWeatherMap API Key</label>
+                    <input type="password" id="weatherKey" placeholder="Enter OpenWeatherMap API key">
+                    <span class="input-status" id="weatherStatus"></span>
+                </div>
+                <div class="api-input-group">
+                    <label for="newsKey">NewsAPI Key</label>
+                    <input type="password" id="newsKey" placeholder="Enter NewsAPI key">
+                    <span class="input-status" id="newsStatus"></span>
+                </div>
+                <div class="api-input-group">
+                    <label for="translateKey">Google Translate API Key</label>
+                    <input type="password" id="translateKey" placeholder="Enter Google Translate API key">
+                    <span class="input-status" id="translateStatus"></span>
+                </div>
+            </div>
+            
+            <div class="config-actions">
+                <button id="saveConfig" class="btn btn-primary"><i class="fas fa-save"></i> Save Configuration</button>
+                <button id="testConfig" class="btn btn-secondary"><i class="fas fa-vial"></i> Test APIs</button>
+                <button id="resetConfig" class="btn btn-outline"><i class="fas fa-undo"></i> Reset</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main App Container -->
+    <div class="app-container">
+        <nav class="navbar">
+            <div class="nav-container">
+                <div class="logo">
+                    <i class="fas fa-microphone-alt"></i>
+                    <span>AI Voice Agent</span>
+                    <span class="version">Day 27</span>
+                </div>
+                <div class="nav-actions">
+                    <button id="config-btn" class="config-btn">
+                        <i class="fas fa-cog"></i>
+                        <span>API Config</span>
+                    </button>
+                    <button id="theme-toggle" class="theme-btn">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
 
     
 
-        <!-- Day 24: Pirate Voice Agent -->
-        <div class="complete-voice-agent pirate-theme">
-            <div class="top-container">
-                <!-- Day 25: Special Skills Showcase -->
-                <div class="skills-showcase">
-                    <div class="hero-section">
-                        <h1 class="hero-title">🏴‍☠️ Captain Blackbeard's Enhanced Voice Agent</h1>
-                        <p class="hero-subtitle">Day 25: Special Skills - Web Search, Weather & News</p>
-                        <div class="hero-description">
-                            <p>⚓ Ahoy! Captain Blackbeard's AI now has special skills to help ye navigate the digital seas! ⚓</p>
-                            <p class="pirate-motto">"Arrr! With these new skills, no treasure of knowledge be beyond our reach!" 🗺️💰</p>
-                        </div>
+        <!-- Hero Section -->
+        <div class="hero-section">
+            <div class="hero-content">
+                <div class="hero-badge">
+                    <i class="fas fa-sparkles"></i>
+                    <span>Day 27 - Enhanced</span>
+                </div>
+                <h1 class="hero-title">AI Voice Agent</h1>
+                <p class="hero-subtitle">Advanced conversational AI with special skills and real-time processing</p>
+                <div class="hero-features">
+                    <div class="feature-pill">
+                        <i class="fas fa-brain"></i>
+                        <span>AI Processing</span>
                     </div>
+                    <div class="feature-pill">
+                        <i class="fas fa-volume-up"></i>
+                        <span>Text-to-Speech</span>
+                    </div>
+                    <div class="feature-pill">
+                        <i class="fas fa-search"></i>
+                        <span>Web Search</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="audio-wave">
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                </div>
+            </div>
+        </div>
         
-                    <!-- Special Skills Demo -->
-                    <div class="skills-demo">
-                        <h3>🛠️ Captain's Special Skills</h3>
-                        <div class="skills-grid">
-                            <div class="skill-card">
-                                <div class="skill-icon">🔍</div>
-                                <h4>Web Search</h4>
-                                <p>Search the vast digital oceans for current information</p>
-                                <div class="skill-examples">
-                                    <span class="example">"What's happening in AI today?"</span>
-                                    <span class="example">"Search for Python tutorials"</span>
-                                </div>
+        <!-- Skills Overview -->
+        <div class="skills-overview">
+            <div class="skills-header">
+                <h2><i class="fas fa-magic"></i> Special Skills</h2>
+                <p>Unlock advanced capabilities with API integrations</p>
+            </div>
+            <div class="skills-grid">
+                <div class="skill-card" data-skill="search">
+                    <div class="skill-icon"><i class="fas fa-search"></i></div>
+                    <h3>Web Search</h3>
+                    <p>Real-time web search powered by Tavily API</p>
+                    <div class="skill-status" id="searchSkillStatus">
+                        <i class="fas fa-times-circle"></i>
+                        <span>Not Configured</span>
+                    </div>
+                </div>
+                <div class="skill-card" data-skill="weather">
+                    <div class="skill-icon"><i class="fas fa-cloud-sun"></i></div>
+                    <h3>Weather</h3>
+                    <p>Weather forecasts via OpenWeatherMap</p>
+                    <div class="skill-status" id="weatherSkillStatus">
+                        <i class="fas fa-times-circle"></i>
+                        <span>Not Configured</span>
+                    </div>
+                </div>
+                <div class="skill-card" data-skill="news">
+                    <div class="skill-icon"><i class="fas fa-newspaper"></i></div>
+                    <h3>News</h3>
+                    <p>Latest news headlines from NewsAPI</p>
+                    <div class="skill-status" id="newsSkillStatus">
+                        <i class="fas fa-times-circle"></i>
+                        <span>Not Configured</span>
+                    </div>
+                </div>
+                <div class="skill-card" data-skill="translate">
+                    <div class="skill-icon"><i class="fas fa-language"></i></div>
+                    <h3>Translation</h3>
+                    <p>Multi-language translation support</p>
+                    <div class="skill-status" id="translateSkillStatus">
+                        <i class="fas fa-times-circle"></i>
+                        <span>Not Configured</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Interface -->
+        <div class="main-interface">
+            <div class="interface-grid-1">
+                <!-- Pipeline Status -->
+                <div class="pipeline-panel">
+                    <div class="panel-header">
+                        <h3 class="panel-header-title"><i class="fas fa-cogs"></i> Processing Pipeline</h3>
+                        <div class="pipeline-indicator" id="pipelineIndicator">
+                            <div class="indicator-dot"></div>
+                            <p>Ready</p>
+                        </div>
+                    </div>
+                    <div class="pipeline-steps">
+                        <div class="step" id="step-recording">
+                            <div class="step-icon"><i class="fas fa-microphone"></i></div>
+                            <div class="step-content">
+                                <div class="step-title">Voice Recording</div>
+                                <div class="step-status" id="recording-status">Ready</div>
+                                <div class="step-progress"><div class="progress-bar"></div></div>
                             </div>
-                            <div class="skill-card">
-                                <div class="skill-icon">🌤️</div>
-                                <h4>Weather Forecast</h4>
-                                <p>Check the weather conditions across all ports</p>
-                                <div class="skill-examples">
-                                    <span class="example">"What's the weather in London?"</span>
-                                    <span class="example">"Will it rain in New York tomorrow?"</span>
-                                </div>
+                        </div>
+                        <div class="step" id="step-stt">
+                            <div class="step-icon"><i class="fas fa-file-audio"></i></div>
+                            <div class="step-content">
+                                <div class="step-title">Speech-to-Text</div>
+                                <div class="step-status" id="stt-status">Waiting</div>
+                                <div class="step-progress"><div class="progress-bar"></div></div>
                             </div>
-                            <div class="skill-card">
-                                <div class="skill-icon">📰</div>
-                                <h4>Latest News</h4>
-                                <p>Get the latest news from around the seven seas</p>
-                                <div class="skill-examples">
-                                    <span class="example">"What's the latest tech news?"</span>
-                                    <span class="example">"Show me business headlines"</span>
-                                </div>
+                        </div>
+                        <div class="step" id="step-ai">
+                            <div class="step-icon"><i class="fas fa-brain"></i></div>
+                            <div class="step-content">
+                                <div class="step-title">AI Processing</div>
+                                <div class="step-status" id="ai-status">Waiting</div>
+                                <div class="step-progress"><div class="progress-bar"></div></div>
                             </div>
-                            <div class="skill-card">
-                                <div class="skill-icon">🌍</div>
-                                <h4>Translation</h4>
-                                <p>Translate text between any languages of the world</p>
-                                <div class="skill-examples">
-                                    <span class="example">"Translate 'Hello' to Spanish"</span>
-                                    <span class="example">"What does 'Bonjour' mean in English?"</span>
-                                </div>
+                        </div>
+                        <div class="step" id="step-tts">
+                            <div class="step-icon"><i class="fas fa-volume-up"></i></div>
+                            <div class="step-content">
+                                <div class="step-title">Text-to-Speech</div>
+                                <div class="step-status" id="tts-status">Waiting</div>
+                                <div class="step-progress"><div class="progress-bar"></div></div>
                             </div>
                         </div>
                     </div>
                 </div>
-
-            <div class="main-content">
-
-                <div class="left-left">
-                    <div class="pipeline-status">
-                        <h3>⚓ Ship's Status ⚓</h3>
-                        <div class="pipeline-steps">
-                            <div class="step" id="step-recording">
-                                <div class="step-icon">🎤</div>
-                                <div class="step-content">
-                                    <div class="step-title">Listening to Crew</div>
-                                    <div class="step-status" id="recording-status">Ready</div>
-                                </div>
-                            </div>
-                            <div class="step" id="step-stt">
-                                <div class="step-icon">🗣️</div>
-                                <div class="step-content">
-                                    <div class="step-title">Deciphering Words</div>
-                                    <div class="step-status" id="stt-status">Waiting</div>
-                                </div>
-                            </div>
-                            <div class="step" id="step-ai">
-                                <div class="step-icon">🧭</div>
-                                <div class="step-content">
-                                    <div class="step-title">Captain's Wisdom</div>
-                                    <div class="step-status" id="ai-status">Waiting</div>
-                                </div>
-                            </div>
-                            <div class="step" id="step-tts">
-                                <div class="step-icon">📢</div>
-                                <div class="step-content">
-                                    <div class="step-title">Captain's Orders</div>
-                                    <div class="step-status" id="tts-status">Waiting</div>
-                                </div>
-                            </div>
-                        </div>
+            </div>    
+            
+            <div class="interface-grid-2">
+                <!-- Control Panel -->
+                <div class="control-panel">
+                    <div class="panel-header">
+                        <h3 class="panel-header-title"><i class="fas fa-sliders-h"></i> Voice Controls</h3>
                     </div>
-                </div>
-                <div class="left-panel">
-                    <!-- Pipeline Status -->
-
-
-                    <!-- Controls -->
-                    <div class="controls-section">
-                        <div class="voice-selector">
-                            <label for="voiceSelect">🎭 Captain's Voice:</label>
-                            <select id="voiceSelect" class="voice-select">
-                                <option value="en-US-natalie" selected>Captain Natalie (Fierce)</option>
-                                <option value="en-IN-rohan">Captain Rohan (Bold)</option>
-                                <option value="en-IN-alia">Captain Alia (Cunning)</option>
-                                <option value="en-IN-priya">Captain Priya (Wise)</option>
+                    
+                    <div class="voice-settings">
+                        <div class="setting-group">
+                            <label for="voiceSelect"><i class="fas fa-user-tie"></i> Voice Selection</label>
+                            <select id="voiceSelect" class="modern-select">
+                                <option value="en-US-natalie" selected>Natalie (Professional)</option>
+                                <option value="en-IN-rohan">Rohan (Confident)</option>
+                                <option value="en-IN-alia">Alia (Friendly)</option>
+                                <option value="en-IN-priya">Priya (Warm)</option>
                             </select>
                         </div>
-
-                        <div class="recording-controls">
-                            <button id="startRecording" class="btn btn-primary">
-                                <span class="btn-icon">🏴‍☠️</span>
-                                Hail the Captain!
-                            </button>
-                            <button id="stopRecording" class="btn btn-secondary" disabled>
-                                <span class="btn-icon">⚓</span>
-                                Drop Anchor
-                            </button>
-                        </div>
-
-                        <div class="connection-status">
-                            <div id="connectionStatus" class="status-indicator">
-                                <span class="status-dot"></span>
-                                <span class="status-text">Connecting...</span>
+                        
+                        <div class="setting-group">
+                            <label><i class="fas fa-volume-up"></i> Audio Quality</label>
+                            <div class="quality-options">
+                                <label class="radio-option">
+                                    <input type="radio" name="quality" value="standard" checked>
+                                    <span>Standard</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="quality" value="high">
+                                    <span>High</span>
+                                </label>
                             </div>
                         </div>
                     </div>
+                    
+                    <div class="recording-controls">
+                        <button id="startRecording" class="btn btn-primary btn-large">
+                            <i class="fas fa-microphone"></i>
+                            <span>Start Conversation</span>
+                        </button>
+                        <button id="stopRecording" class="btn btn-danger btn-large" disabled>
+                            <i class="fas fa-stop"></i>
+                            <span>Stop Recording</span>
+                        </button>
+                    </div>
+                    
+                    <div class="connection-status">
+                        <div id="connectionStatus" class="status-card">
+                            <div class="status-icon">
+                                <i class="fas fa-wifi"></i>
+                            </div>
+                            <div class="status-info">
+                                <div class="status-title">Connection Status</div>
+                                <div class="status-text">Connecting...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                    <!-- Live Transcription -->
-                    <div class="transcription-section">
-                        <h3>🗞️ Captain's Log 🗞️</h3>
-                        <div class="transcription-container">
+                <!-- Transcription Panel -->
+                <div class="transcription-panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-file-alt"></i> Live Transcription</h3>
+                        <div class="transcription-controls">
+                            <button id="clearTranscript" class="btn btn-outline btn-sm">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="transcription-display">
+                        <div class="transcript-section">
+                            <div class="transcript-label">Partial Transcript</div>
                             <div id="partialTranscript" class="partial-transcript">
-                                Speak to the Captain, matey...
+                                <div class="transcript-placeholder">
+                                    <i class="fas fa-microphone-slash"></i>
+                                    <span>Waiting for speech input...</span>
+                                </div>
                             </div>
+                        </div>
+                        <div class="transcript-section">
+                            <div class="transcript-label">Final Transcript</div>
                             <div id="finalTranscript" class="final-transcript">
-                                Yer words will be recorded in the ship's log
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Audio Playback -->
-                    <div class="audio-section">
-                        <h3>🔊 Captain's Voice 🔊</h3>
-                        <div class="audio-controls">
-                            <div class="audio-info">
-                                <div class="info-item">
-                                    <span class="info-label">Chunks:</span>
-                                    <span id="chunksReceived" class="info-value">0</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-label">Progress:</span>
-                                    <span id="audioProgress" class="info-value">0%</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-label">Time:</span>
-                                    <span id="playbackTime" class="info-value">0.0s</span>
-                                </div>
-                            </div>
-                            <div id="audioPlaybackStatus" class="audio-status">
-                                Ready to stream audio...
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="right-panel">
-                    <!-- Chat History -->
-                    <div class="chat-history-section">
-                        <div class="chat-header">
-                            <h4>⚓ Captain's Log ⚓</h4>
-                            <div class="conversation-controls">
-                                <button id="clearChat" class="btn btn-outline btn-sm">Clear History</button>
-                                <div id="chatCount" class="chat-count">0 messages</div>
-                            </div>
-                        </div>
-                        <div id="chatHistory" class="chat-history">
-                            <div class="welcome-message">
-                                <div class="message-icon">🏴‍☠️</div>
-                                <div class="message-content">
-                                    <h4>Ahoy! Welcome aboard Captain Blackbeard's ship!</h4>
-                                    <p>Click "Hail the Captain!" and speak yer mind, matey. The Captain's AI will transcribe yer words, think like a true pirate, and respond with the wisdom of the seven seas!</p>
+                                <div class="transcript-placeholder">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Final transcription will appear here</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+                
+                <!-- Audio Panel -->
+                <div class="audio-panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-headphones"></i> Audio Playback</h3>
+                        <div class="audio-controls-header">
+                            <button id="muteToggle" class="btn btn-outline btn-sm">
+                                <i class="fas fa-volume-up"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="audio-display">
+                        <div class="audio-visualizer">
+                            <div class="visualizer-bars">
+                                <div class="bar"></div>
+                                <div class="bar"></div>
+                                <div class="bar"></div>
+                                <div class="bar"></div>
+                                <div class="bar"></div>
+                                <div class="bar"></div>
+                                <div class="bar"></div>
+                                <div class="bar"></div>
+                            </div>
+                        </div>
+                        <div class="audio-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Chunks</span>
+                                <span id="chunksReceived" class="stat-value">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Progress</span>
+                                <span id="audioProgress" class="stat-value">0%</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Duration</span>
+                                <span id="playbackTime" class="stat-value">0.0s</span>
+                            </div>
+                        </div>
+                        <div id="audioPlaybackStatus" class="audio-status-modern">
+                            <i class="fas fa-play-circle"></i>
+                            <span>Ready for audio playback</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="interface-grid-3">
+                <!-- Chat History Panel -->
+                <div class="chat-panel">
+                    <div class="panel-header">
+                        <h3 class="panel-header-title"><i class="fas fa-comments"></i> Conversation History</h3>
+                        <div class="chat-controls">
+                            <button id="exportChat" class="btn btn-outline btn-sm">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button id="clearChat" class="btn btn-outline btn-sm">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            <div id="chatCount" class="message-counter">0 messages</div>
+                        </div>
+                    </div>
+                    <div id="chatHistory" class="chat-history-modern">
+                        <div class="welcome-message-modern">
+                            <div class="welcome-icon">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="welcome-content">
+                                <h4>Welcome to AI Voice Agent</h4>
+                                <p>Start a conversation by clicking "Start Conversation" and speaking naturally. The AI will process your speech and respond with intelligent, contextual answers.</p>
+                                <div class="welcome-features">
+                                    <span class="feature-tag"><i class="fas fa-microphone"></i> Voice Input</span>
+                                    <span class="feature-tag"><i class="fas fa-brain"></i> AI Processing</span>
+                                    <span class="feature-tag"><i class="fas fa-volume-up"></i> Audio Output</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Day 27: API Configuration Sidebar -->
+    <div id="api-config-sidebar" class="api-config-sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-cog"></i> API Configuration</h3>
+            <button id="close-config" class="close-btn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="sidebar-content">
+            <div class="config-section">
+                <h4><i class="fas fa-microchip"></i> Core Services</h4>
+                
+                <div class="api-key-group">
+                    <label for="assemblyai-key">
+                        <i class="fas fa-microphone"></i> AssemblyAI (Speech-to-Text)
+                        <span id="assemblyai-status" class="status-indicator missing"></span>
+                    </label>
+                    <input type="password" id="assemblyai-key" placeholder="Enter AssemblyAI API Key">
+                </div>
+                
+                <div class="api-key-group">
+                    <label for="gemini-key">
+                        <i class="fas fa-brain"></i> Google Gemini (LLM)
+                        <span id="gemini-status" class="status-indicator missing"></span>
+                    </label>
+                    <input type="password" id="gemini-key" placeholder="Enter Gemini API Key">
+                </div>
+                
+                <div class="api-key-group">
+                    <label for="murf-key">
+                        <i class="fas fa-volume-up"></i> Murf AI (Text-to-Speech)
+                        <span id="murf-status" class="status-indicator missing"></span>
+                    </label>
+                    <input type="password" id="murf-key" placeholder="Enter Murf API Key">
+                </div>
+            </div>
+            
+            <div class="config-section">
+                <h4><i class="fas fa-puzzle-piece"></i> Special Skills</h4>
+                
+                <div class="api-key-group">
+                    <label for="tavily-key">
+                        <i class="fas fa-search"></i> Tavily (Web Search)
+                        <span id="tavily-status" class="status-indicator missing"></span>
+                    </label>
+                    <input type="password" id="tavily-key" placeholder="Enter Tavily API Key">
+                </div>
+                
+                <div class="api-key-group">
+                    <label for="openweather-key">
+                        <i class="fas fa-cloud-sun"></i> OpenWeatherMap
+                        <span id="openweather-status" class="status-indicator missing"></span>
+                    </label>
+                    <input type="password" id="openweather-key" placeholder="Enter OpenWeather API Key">
+                </div>
+                
+                <div class="api-key-group">
+                    <label for="news-key">
+                        <i class="fas fa-newspaper"></i> NewsAPI
+                        <span id="news-status" class="status-indicator missing"></span>
+                    </label>
+                    <input type="password" id="news-key" placeholder="Enter NewsAPI Key">
+                </div>
+                
+                <div class="api-key-group">
+                    <label for="google_translate-key">
+                        <i class="fas fa-language"></i> Google Translate
+                        <span id="google_translate-status" class="status-indicator missing"></span>
+                    </label>
+                    <input type="password" id="google_translate-key" placeholder="Enter Google Translate API Key">
+                </div>
+            </div>
+            
+            <div class="config-actions">
+                <button id="save-config" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Save Configuration
+                </button>
+                <button id="test-config" class="btn btn-secondary">
+                    <i class="fas fa-check-circle"></i> Test API Keys
+                </button>
+                <button id="reset-config" class="btn btn-danger">
+                    <i class="fas fa-trash"></i> Reset
+                </button>
             </div>
         </div>
     </div>

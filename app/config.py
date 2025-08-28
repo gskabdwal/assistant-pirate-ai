@@ -2,19 +2,27 @@
 Configuration settings for the AI Voice Agent.
 """
 import os
-import logging
 import sys
+import logging
 from pathlib import Path
+from typing import Optional
+
+# Load environment variables from .env file
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Get the base directory and load .env file
+BASE_DIR = Path(__file__).resolve().parent.parent
+env_path = BASE_DIR / '.env'
+print(f" Loading .env from: {env_path}")
+print(f" .env file exists: {env_path.exists()}")
+
+load_dotenv(env_path)
 
 
 class Config:
     """Application configuration."""
     
-    # API Keys
+    # API Keys - Default to environment variables, can be overridden by frontend
     MURF_API_KEY = os.getenv("MURF_API_KEY")
     ASSEMBLYAI_API_KEY = os.getenv("ASSEMBLYAI_API_KEY")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -26,6 +34,105 @@ class Config:
     
     # Translation Skill API Key (Day 26)
     GOOGLE_TRANSLATE_API_KEY = os.getenv("GOOGLE_TRANSLATE_API_KEY")
+    
+    # Runtime API keys (can be set by frontend)
+    _runtime_api_keys = {}
+    
+    @classmethod
+    def set_api_key(cls, service: str, api_key: str) -> None:
+        """Set API key at runtime with basic validation."""
+        service_upper = service.upper()
+        if api_key and api_key.strip():
+            cleaned_key = api_key.strip()
+            
+            # Basic API key format validation
+            if cls._validate_api_key_format(service_upper, cleaned_key):
+                cls._runtime_api_keys[service_upper] = cleaned_key
+            else:
+                raise ValueError(f"Invalid API key format for {service_upper}")
+        else:
+            # Remove the key if empty
+            cls._runtime_api_keys.pop(service_upper, None)
+    
+    @classmethod
+    def _validate_api_key_format(cls, service: str, api_key: str) -> bool:
+        """Basic API key format validation."""
+        # Minimum length check
+        if len(api_key) < 10:
+            return False
+        
+        # Service-specific format checks
+        if service == 'ASSEMBLYAI':
+            # AssemblyAI keys are typically 32+ chars, alphanumeric
+            return len(api_key) >= 32 and api_key.replace('-', '').replace('_', '').isalnum()
+        elif service == 'OPENWEATHER':
+            # OpenWeather keys are typically 32 chars, alphanumeric
+            return len(api_key) == 32 and api_key.isalnum()
+        elif service == 'TAVILY':
+            # Tavily keys start with 'tvly-' and are longer
+            return api_key.startswith('tvly-') and len(api_key) > 20
+        elif service == 'NEWS':
+            # NewsAPI keys are typically 32 chars, alphanumeric
+            return len(api_key) == 32 and api_key.isalnum()
+        elif service == 'GEMINI':
+            # Gemini keys start with specific prefixes
+            return (api_key.startswith('AIza') or api_key.startswith('AIzaSy')) and len(api_key) > 30
+        elif service == 'MURF':
+            # Murf keys - less strict validation
+            return len(api_key) >= 20
+        elif service == 'GOOGLE_TRANSLATE':
+            # Google Cloud keys
+            return (api_key.startswith('AIza') or api_key.startswith('AIzaSy')) and len(api_key) > 30
+        
+        # Default: just check minimum length
+        return len(api_key) >= 10
+    
+    @classmethod
+    def get_api_key(cls, service: str) -> str:
+        """Get API key, prioritizing runtime keys over environment variables."""
+        service_upper = service.upper()
+        
+        # Check runtime keys first
+        if service_upper in cls._runtime_api_keys:
+            return cls._runtime_api_keys[service_upper]
+        
+        # Fallback to environment variables
+        env_key_map = {
+            'MURF': cls.MURF_API_KEY,
+            'ASSEMBLYAI': cls.ASSEMBLYAI_API_KEY,
+            'GEMINI': cls.GEMINI_API_KEY,
+            'TAVILY': cls.TAVILY_API_KEY,
+            'OPENWEATHER': cls.OPENWEATHER_API_KEY,
+            'NEWS': cls.NEWS_API_KEY,
+            'GOOGLE_TRANSLATE': cls.GOOGLE_TRANSLATE_API_KEY,
+        }
+        
+        return env_key_map.get(service_upper, '')
+    
+    @classmethod
+    def get_api_status(cls) -> dict:
+        """Get status of all API keys."""
+        services = ['MURF', 'ASSEMBLYAI', 'GEMINI', 'TAVILY', 'OPENWEATHER', 'NEWS', 'GOOGLE_TRANSLATE']
+        status = {}
+        
+        # Debug logging
+        print("🔍 DEBUG: Checking API key status...")
+        print(f"🔍 Runtime keys: {list(cls._runtime_api_keys.keys())}")
+        
+        for service in services:
+            api_key = cls.get_api_key(service)
+            env_key = os.getenv(f"{service}_API_KEY")
+            
+            # Debug logging for each service
+            print(f"🔍 {service}: runtime={service in cls._runtime_api_keys}, env_key={'✓' if env_key else '✗'}, final_key={'✓' if api_key else '✗'}")
+            
+            status[service.lower()] = {
+                'configured': bool(api_key),
+                'source': 'runtime' if service in cls._runtime_api_keys else 'environment',
+                'api_key': api_key  # Include the actual API key (will be masked on frontend)
+            }
+        
+        return status
     
     # Application settings
     APP_TITLE = "AI Voice Agent"

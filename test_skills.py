@@ -17,14 +17,17 @@ async def test_weather_skill():
     """Test weather skill functionality."""
     print("🌤️ Testing Weather Skill...")
     
-    # Check if API key is configured
-    if not Config.OPENWEATHER_API_KEY:
-        print("❌ OPENWEATHER_API_KEY not configured in .env file")
+    # Check if API key is configured (runtime or environment)
+    weather_key = Config.get_api_key("OPENWEATHER")
+    if not weather_key:
+        print("❌ OPENWEATHER_API_KEY not configured")
         return False
+    
+    print(f"✅ Weather API key found: {weather_key[:8]}...")
     
     # Initialize skill manager
     skill_manager = SkillManager(
-        weather_api_key=Config.OPENWEATHER_API_KEY
+        weather_api_key=weather_key
     )
     
     # Test weather skill
@@ -47,14 +50,17 @@ async def test_web_search_skill():
     """Test web search skill functionality."""
     print("🔍 Testing Web Search Skill...")
     
-    # Check if API key is configured
-    if not Config.TAVILY_API_KEY:
-        print("❌ TAVILY_API_KEY not configured in .env file")
+    # Check if API key is configured (runtime or environment)
+    tavily_key = Config.get_api_key("TAVILY")
+    if not tavily_key:
+        print("❌ TAVILY_API_KEY not configured")
         return False
+    
+    print(f"✅ Tavily API key found: {tavily_key[:8]}...")
     
     # Initialize skill manager
     skill_manager = SkillManager(
-        tavily_api_key=Config.TAVILY_API_KEY
+        tavily_api_key=tavily_key
     )
     
     # Test web search skill
@@ -77,14 +83,17 @@ async def test_news_skill():
     """Test news skill functionality."""
     print("📰 Testing News Skill...")
     
-    # Check if API key is configured
-    if not Config.NEWS_API_KEY:
-        print("❌ NEWS_API_KEY not configured in .env file")
+    # Check if API key is configured (runtime or environment)
+    news_key = Config.get_api_key("NEWS")
+    if not news_key:
+        print("❌ NEWS_API_KEY not configured")
         return False
+    
+    print(f"✅ News API key found: {news_key[:8]}...")
     
     # Initialize skill manager
     skill_manager = SkillManager(
-        news_api_key=Config.NEWS_API_KEY
+        news_api_key=news_key
     )
     
     # Test news skill
@@ -109,9 +118,10 @@ async def test_function_definitions():
     
     # Initialize skill manager with all skills
     skill_manager = SkillManager(
-        tavily_api_key=Config.TAVILY_API_KEY,
-        weather_api_key=Config.OPENWEATHER_API_KEY,
-        news_api_key=Config.NEWS_API_KEY
+        tavily_api_key=Config.get_api_key("TAVILY"),
+        weather_api_key=Config.get_api_key("OPENWEATHER"),
+        news_api_key=Config.get_api_key("NEWS"),
+        translate_api_key=Config.get_api_key("GOOGLE_TRANSLATE")
     )
     
     # Get function definitions

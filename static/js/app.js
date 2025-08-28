@@ -9,6 +9,11 @@ let isStreaming = false;
 let isLLMStreaming = false;
 let chatService = null; // Initialize chat service
 
+// Day 27: API Configuration variables
+let apiConfigSidebar = null;
+let apiKeyInputs = {};
+let apiStatusIndicators = {};
+
 // Streaming transcription variables
 let transcribeWebSocket;
 let streamMediaRecorder;
@@ -92,12 +97,12 @@ function setLLMButtonStates(startDisabled, stopDisabled) {
     if (startLLMRecordingBtn) {
         startLLMRecordingBtn.disabled = startDisabled;
     } else {
-        console.error('startLLMRecordingBtn not found');
+        console.warn('startLLMRecordingBtn not found - may not be implemented in current UI');
     }
     if (stopLLMRecordingBtn) {
         stopLLMRecordingBtn.disabled = stopDisabled;
     } else {
-        console.error('stopLLMRecordingBtn not found');
+        console.warn('stopLLMRecordingBtn not found - may not be implemented in current UI');
     }
 }
 
@@ -107,12 +112,12 @@ function setStreamButtonStates(startDisabled, stopDisabled) {
     if (startStreamRecordingBtn) {
         startStreamRecordingBtn.disabled = startDisabled;
     } else {
-        console.error('startStreamRecordingBtn not found');
+        console.warn('startStreamRecordingBtn not found - may not be implemented in current UI');
     }
     if (stopStreamRecordingBtn) {
         stopStreamRecordingBtn.disabled = stopDisabled;
     } else {
-        console.error('stopStreamRecordingBtn not found');
+        console.warn('stopStreamRecordingBtn not found - may not be implemented in current UI');
     }
 }
 
@@ -1833,14 +1838,14 @@ function initApp() {
         
         // Set Complete Voice Agent button states (disabled until WebSocket connects)
         if (startRecordingBtn) {
-            startRecordingBtn.disabled = true;
-            startRecordingBtn.textContent = 'Connecting...';
+            startRecordingBtn.disabled = false;
+            startRecordingBtn.textContent = 'Start Server Connection';
         }
         if (stopRecordingBtn) {
             stopRecordingBtn.disabled = true;
         }
         if (connectionStatus) {
-            connectionStatus.textContent = 'Connecting...';
+            connectionStatus.textContent = 'Ready to Connect';
             connectionStatus.className = 'connection-status connecting';
         }
         
@@ -1972,10 +1977,10 @@ function connectCompleteVoiceWebSocket() {
             completeVoiceMediaRecorder = null;
         }
         
-        // Disable buttons and update connection status
+        // Enable start button for reconnection, disable stop button
         if (startRecordingBtn) {
-            startRecordingBtn.disabled = true;
-            startRecordingBtn.textContent = 'Connecting...';
+            startRecordingBtn.disabled = false;
+            startRecordingBtn.textContent = 'Disconnected - Click to Reconnect';
         }
         if (stopRecordingBtn) stopRecordingBtn.disabled = true;
         
@@ -2871,6 +2876,15 @@ function setupEventListeners() {
     if (startRecordingBtn) {
         startRecordingBtn.addEventListener('click', async () => {
             try {
+                // Check if we need to reconnect WebSocket first
+                if (startRecordingBtn.textContent.includes('Disconnected') || 
+                    startRecordingBtn.textContent.includes('Connecting')) {
+                    console.log('🤖 Day 23: Reconnecting WebSocket...');
+                    startRecordingBtn.textContent = 'Connecting...';
+                    connectCompleteVoiceWebSocket();
+                    return;
+                }
+                
                 await startCompleteVoiceRecording();
             } catch (error) {
                 console.error('🤖 Day 23: Error in startCompleteVoiceRecording:', error);
@@ -3036,8 +3050,463 @@ function stopLLMRecording() {
     }
 }
 
+// Day 27: API Configuration Functions
+function initAPIConfiguration() {
+    console.log('Initializing API Configuration...');
+    
+    apiConfigSidebar = document.getElementById('api-config-sidebar');
+    if (!apiConfigSidebar) {
+        console.error('API config sidebar not found');
+        return;
+    }
+    
+    // Initialize API key inputs and status indicators
+    const services = ['assemblyai', 'gemini', 'murf', 'tavily', 'openweather', 'news', 'google_translate'];
+    services.forEach(service => {
+        apiKeyInputs[service] = document.getElementById(`${service}-key`);
+        apiStatusIndicators[service] = document.getElementById(`${service}-status`);
+        
+        if (!apiKeyInputs[service]) {
+            console.warn(`API key input for ${service} not found`);
+        }
+        if (!apiStatusIndicators[service]) {
+            console.warn(`Status indicator for ${service} not found`);
+        }
+    });
+    
+    // Load current API status
+    loadAPIStatus();
+    
+    // Set up event listeners with error checking
+    const configBtn = document.getElementById('config-btn');
+    if (configBtn) {
+        configBtn.addEventListener('click', (e) => {
+            console.log('Config button clicked!');
+            e.preventDefault();
+            toggleAPIConfig();
+        });
+        console.log('Config button listener added');
+    } else {
+        console.error('Config button not found');
+    }
+    
+    const closeBtn = document.getElementById('close-config');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeAPIConfig);
+    } else {
+        console.warn('Close config button not found');
+    }
+    
+    const saveBtn = document.getElementById('save-config');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', saveAPIKeys);
+    } else {
+        console.warn('Save config button not found');
+    }
+    
+    const testBtn = document.getElementById('test-config');
+    if (testBtn) {
+        testBtn.addEventListener('click', testAPIKeys);
+    } else {
+        console.warn('Test config button not found');
+    }
+    
+    const resetBtn = document.getElementById('reset-config');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', resetAPIKeys);
+    } else {
+        console.warn('Reset config button not found');
+    }
+    
+    // Theme toggle (placeholder for future implementation)
+    const themeBtn = document.getElementById('theme-toggle');
+    if (themeBtn) {
+        themeBtn.addEventListener('click', () => {
+            console.log('Theme toggle clicked - feature coming soon!');
+        });
+    } else {
+        console.warn('Theme toggle button not found');
+    }
+}
+
+function toggleAPIConfig() {
+    console.log('toggleAPIConfig called');
+    console.log('apiConfigSidebar:', apiConfigSidebar);
+    
+    if (apiConfigSidebar.classList.contains('open')) {
+        console.log('Closing sidebar');
+        closeAPIConfig();
+    } else {
+        console.log('Opening sidebar');
+        openAPIConfig();
+    }
+}
+
+function openAPIConfig() {
+    console.log('Opening API config sidebar');
+    console.log('Sidebar element:', apiConfigSidebar);
+    apiConfigSidebar.classList.add('open');
+    console.log('Added open class, current classes:', apiConfigSidebar.className);
+    loadAPIStatus(); // Refresh status when opening
+}
+
+function closeAPIConfig() {
+    apiConfigSidebar.classList.remove('open');
+}
+
+async function loadAPIStatus() {
+    try {
+        console.log('Loading API status...');
+        const response = await fetch('/api/config/status');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const status = await response.json();
+        console.log('API Status Response:', status);
+        
+        // Define the mapping between service names in the UI and backend
+        const serviceMap = {
+            'assemblyai': 'assemblyai',
+            'murf': 'murf',
+            'gemini': 'gemini',
+            'tavily': 'tavily',
+            'openweather': 'openweather',
+            'news': 'news',
+            'google_translate': 'google_translate'
+        };
+        
+        // Update status indicators and skills overview
+        Object.entries(serviceMap).forEach(([uiService, backendService]) => {
+            const serviceInfo = status[backendService] || { configured: false, source: 'missing' };
+            const indicator = document.getElementById(`${uiService}-status`);
+            const inputElement = document.getElementById(`${uiService}-key`);
+            
+            console.log(`Processing ${uiService} (backend: ${backendService}):`, serviceInfo);
+            
+            // Update status indicator
+            if (indicator) {
+                // Clear existing classes
+                indicator.className = 'status-indicator';
+                
+                // Update status based on configuration
+                if (serviceInfo.configured) {
+                    indicator.classList.add('configured');
+                    indicator.title = 'API key is configured';
+                    console.log(`✅ ${uiService} is configured`);
+                } else {
+                    indicator.classList.add('missing');
+                    indicator.title = 'API key not configured';
+                    console.log(`❌ ${uiService} is missing`);
+                    
+                    // Clear any saved key from the input for security
+                    if (inputElement) {
+                        inputElement.value = '';
+                    }
+                }
+            }
+            
+            // Update input field with current key if it exists
+            if (inputElement && serviceInfo.configured) {
+                // Get the key from the server response if available
+                const currentKey = serviceInfo.api_key || '';
+                if (currentKey) {
+                    // Show first 4 and last 4 characters of the key for security
+                    const displayKey = currentKey.length > 8 
+                        ? `${currentKey.substring(0, 4)}...${currentKey.substring(currentKey.length - 4)}`
+                        : '********';
+                    inputElement.value = displayKey;
+                    // Keep input type as password for security
+                }
+            }
+        });
+        
+        // Update skill card statuses
+        updateSkillCardStatuses(status);
+        
+        // Run initial test of API keys to validate them
+        await testAPIKeys();
+        
+        console.log('API status loaded successfully');
+        
+    } catch (error) {
+        console.error('Error loading API status:', error);
+        showNotification(`Error loading API status: ${error.message}`, 'error');
+    }
+}
+
+async function saveAPIKeys() {
+    const apiKeys = {};
+    let hasKeys = false;
+    
+    // Collect all non-empty API keys
+    Object.entries(apiKeyInputs).forEach(([service, input]) => {
+        if (input && input.value.trim()) {
+            apiKeys[service] = input.value.trim();
+            hasKeys = true;
+        }
+    });
+    
+    if (!hasKeys) {
+        showNotification('Please enter at least one API key', 'warning');
+        return;
+    }
+    
+    console.log('Saving API keys:', Object.keys(apiKeys));
+    
+    try {
+        let successCount = 0;
+        let errorCount = 0;
+        
+        // Save each API key individually
+        for (const [service, apiKey] of Object.entries(apiKeys)) {
+            try {
+                const response = await fetch('/api/config/key', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        service: service.toUpperCase(), 
+                        api_key: apiKey 
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        console.log(`✅ ${service} API key saved successfully`);
+                        successCount++;
+                    } else {
+                        console.error(`❌ Failed to save ${service} API key:`, result);
+                        showNotification(`${service}: ${result.message || 'Save failed'}`, 'error');
+                        errorCount++;
+                    }
+                } else {
+                    // Handle HTTP error responses (like 400 for validation errors)
+                    const errorResult = await response.json();
+                    const errorMessage = errorResult.detail || `HTTP ${response.status} error`;
+                    console.error(`❌ Validation error for ${service}:`, errorMessage);
+                    showNotification(`${service}: ${errorMessage}`, 'error');
+                    errorCount++;
+                }
+            } catch (error) {
+                console.error(`❌ Network error saving ${service} API key:`, error);
+                showNotification(`${service}: Network error`, 'error');
+                errorCount++;
+            }
+        }
+        
+        // Also handle clearing empty keys (when user clears a field)
+        const allServices = ['assemblyai', 'murf', 'gemini', 'tavily', 'openweather', 'news', 'google_translate'];
+        for (const service of allServices) {
+            const input = apiKeyInputs[service];
+            if (input && !input.value.trim() && input.dataset.hadValue === 'true') {
+                // This field was cleared, send empty key to remove it
+                try {
+                    const response = await fetch('/api/config/key', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ 
+                            service: service.toUpperCase(), 
+                            api_key: '' 
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        console.log(`🗑️ ${service} API key cleared successfully`);
+                        input.dataset.hadValue = 'false';
+                    }
+                } catch (error) {
+                    console.error(`❌ Error clearing ${service} API key:`, error);
+                }
+            } else if (input && input.value.trim()) {
+                input.dataset.hadValue = 'true';
+            }
+        }
+        
+        // Show summary message
+        if (successCount > 0) {
+            showNotification(`Successfully saved ${successCount} API key(s)`, 'success');
+            // Refresh the API status display and skill cards
+            await loadAPIStatus();
+        }
+        
+        // Don't show generic error count since specific errors are already shown above
+        
+    } catch (error) {
+        console.error('Error saving API keys:', error);
+        showNotification('Error saving API keys', 'error');
+    }
+}
+
+async function testAPIKeys() {
+    const testBtn = document.getElementById('test-config');
+    const originalText = testBtn.innerHTML;
+    testBtn.disabled = true;
+    testBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+    
+    showNotification('Testing API keys...', 'info');
+    
+    try {
+        const response = await fetch('/api/config/test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const results = await response.json();
+        
+        // Update UI with test results
+        Object.entries(results).forEach(([service, info]) => {
+            const statusElement = document.getElementById(`${service}-status`);
+            if (statusElement) {
+                // Clear existing classes
+                statusElement.className = 'status-indicator';
+                
+                // Add status class
+                if (info.status === 'valid') {
+                    statusElement.classList.add('configured');
+                    statusElement.title = info.message || 'API key is valid';
+                } else if (info.status === 'error') {
+                    statusElement.classList.add('error');
+                    statusElement.title = info.message || 'API key validation failed';
+                } else {
+                    statusElement.classList.add('missing');
+                    statusElement.title = info.message || 'API key not configured';
+                }
+                
+                // Update skill cards
+                const skillCard = document.querySelector(`.skill-card[data-service="${service}"]`);
+                if (skillCard) {
+                    skillCard.classList.remove('configured', 'error', 'missing');
+                    skillCard.classList.add(info.status || 'missing');
+                    
+                    const statusBadge = skillCard.querySelector('.skill-status');
+                    if (statusBadge) {
+                        statusBadge.textContent = info.status === 'valid' ? '✓ Configured' : 
+                                               info.status === 'error' ? '✗ Error' : '⚠ Missing';
+                    }
+                }
+            }
+        });
+        
+        // Show summary notification
+        const validCount = Object.values(results).filter(r => r.status === 'valid').length;
+        const total = Object.keys(results).length;
+        showNotification(`Test complete: ${validCount} of ${total} services configured successfully`, 
+                       validCount === total ? 'success' : validCount > 0 ? 'warning' : 'error');
+        
+    } catch (error) {
+        console.error('Error testing API keys:', error);
+        showNotification(`Error testing API keys: ${error.message}`, 'error');
+    } finally {
+        testBtn.disabled = false;
+        testBtn.innerHTML = originalText;
+    }
+}
+
+function resetAPIKeys() {
+    if (confirm('Are you sure you want to clear all API key inputs?')) {
+        Object.values(apiKeyInputs).forEach(input => {
+            if (input) input.value = '';
+        });
+        showNotification('API key inputs cleared', 'info');
+    }
+}
+
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <i class="fas ${getNotificationIcon(type)}"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Show notification
+    setTimeout(() => notification.classList.add('show'), 100);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+    }, 5000);
+}
+
+function getNotificationIcon(type) {
+    switch (type) {
+        case 'success': return 'fa-check-circle';
+        case 'error': return 'fa-exclamation-circle';
+        case 'warning': return 'fa-exclamation-triangle';
+        default: return 'fa-info-circle';
+    }
+}
+
 // Wait for DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize LLM app
     initApp();
+    
+    // Initialize Day 27: API Configuration
+    initAPIConfiguration();
 });
+
+function updateSkillCardStatuses(apiStatus) {
+    console.log('Updating skill card statuses with:', apiStatus);
+    
+    // Map skill cards to their corresponding API services
+    const skillToServiceMap = {
+        'search': 'tavily',
+        'weather': 'openweather', 
+        'news': 'news',
+        'translate': 'google_translate'
+    };
+    
+    // Update each skill card
+    Object.entries(skillToServiceMap).forEach(([skillName, serviceName]) => {
+        const skillCard = document.querySelector(`[data-skill="${skillName}"]`);
+        if (!skillCard) {
+            console.warn(`Skill card not found for: ${skillName}`);
+            return;
+        }
+        
+        const statusElement = skillCard.querySelector('.skill-status span');
+        if (!statusElement) {
+            console.warn(`Status element not found for skill: ${skillName}`);
+            return;
+        }
+        
+        const serviceStatus = apiStatus[serviceName];
+        console.log(`🔍 Checking ${skillName} -> ${serviceName}:`, serviceStatus);
+        
+        // Always reset all classes first
+        skillCard.classList.remove('configured', 'error', 'missing');
+        statusElement.className = '';
+        
+        if (serviceStatus && serviceStatus.configured) {
+            statusElement.textContent = 'Configured';
+            statusElement.className = 'configured';
+            skillCard.classList.add('configured');
+            console.log(`✅ ${skillName} skill marked as configured`);
+        } else {
+            statusElement.textContent = 'Not Configured';
+            statusElement.className = 'not-configured';
+            skillCard.classList.add('missing');
+            console.log(`❌ ${skillName} skill marked as not configured`);
+        }
+    });
+}

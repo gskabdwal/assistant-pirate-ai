@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 26, we've completed the **Enhanced Voice Agent with Translation Skills** - a fully integrated conversational AI system featuring Captain Blackbeard's pirate persona enhanced with four powerful special skills: Web Search, Weather Forecasting, News Headlines, and Multi-Language Translation. The implementation provides seamless voice interaction with pirate-themed UI, real-time pipeline visualization, streaming audio playback, and intelligent function calling capabilities including automatic language detection and translation between 100+ languages.
+This project evolves over 30 days to build a fully functional AI Voice Agent. As of Day 27, we've completed the **Production-Ready Voice Agent with Dynamic API Configuration** - a fully integrated conversational AI system featuring Captain Blackbeard's pirate persona enhanced with four powerful special skills: Web Search, Weather Forecasting, News Headlines, and Multi-Language Translation. The implementation provides seamless voice interaction with modern UI, real-time pipeline visualization, streaming audio playback, intelligent function calling capabilities, and most importantly - user-centric API key management that makes the application truly production-ready for hosted environments.
 
 ### Project Structure
 
@@ -46,8 +46,16 @@ This project evolves over 30 days to build a fully functional AI Voice Agent. As
    pip install -r requirements.txt
    ```
 
-2. **Set up environment variables**
+2. **Set up API keys (Day 27 Update)**
 
+   **Option 1: Dynamic UI Configuration (Recommended)**
+   - Start the server and navigate to http://localhost:8000
+   - Click the "⚙️ API Config" button in the top-right corner
+   - Enter your API keys directly in the configuration sidebar
+   - Keys are validated and stored in runtime memory
+   - No server restart required for key updates
+
+   **Option 2: Environment File (Traditional)**
    Create a `.env` file in the project root with your API keys:
    ```
    # Core Voice Agent APIs
@@ -237,6 +245,31 @@ streamed_audio_{unique_session_id}_{timestamp}.wav
 Example: `streamed_audio_7d47a72f-8dc0-4163-a21a-914fb6e3de15_1755437664.wav`
 
 ### Features
+
+#### Day 27: Production-Ready API Configuration 🔧
+
+**Dynamic API Key Management:**
+- **Runtime Configuration**: API keys can be set and updated through the web UI without server restarts
+- **Configuration Sidebar**: Modern, secure API key input interface with masked password fields
+- **Real-time Validation**: API keys are validated for proper format before being accepted
+- **Service Reinitialization**: All services (STT, TTS, LLM, Skills) automatically reinitialize with new keys
+- **Status Indicators**: Skill cards and UI elements dynamically reflect current API key configuration status
+- **Error Handling**: Detailed error messages for invalid keys with service-specific validation rules
+
+**Key Features:**
+- **No Server Restarts**: Update API keys on-the-fly without interrupting service
+- **Secure Input**: API keys are masked in the UI and never exposed in full
+- **Comprehensive Validation**: Format validation for AssemblyAI, Murf, Gemini, Tavily, OpenWeather, NewsAPI, and Google Translate APIs
+- **Visual Feedback**: Skill cards show "Configured" (green) or "Not Configured" (gray) status
+- **Persistent Storage**: Keys stored in runtime memory with environment variable fallback
+- **Production Ready**: Enables deployment to hosted environments where users can configure their own API keys
+
+**Technical Implementation:**
+- **Enhanced Config Class**: Runtime API key storage with validation and dynamic retrieval
+- **REST Endpoints**: `/api/config/key`, `/api/config/status`, `/api/config/reinitialize` for key management
+- **Service Architecture**: All services use `Config.get_api_key()` for dynamic key retrieval
+- **WebSocket Integration**: Real-time services (STT, TTS) use current API keys without restart
+- **Error Recovery**: Graceful handling of invalid keys with clear user feedback
 
 #### Day 26: Translation Skill - Multi-Language Support 🌍
 

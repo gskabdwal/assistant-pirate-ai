@@ -9,19 +9,21 @@ import base64
 import time
 from typing import Dict, Any
 import logging
-from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Request, Depends, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
+from fastapi import FastAPI, File, UploadFile, Form, WebSocket, WebSocketDisconnect, HTTPException, Request, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
+from pydantic import BaseModel
+from typing import Dict, Any
 import uvicorn
-from contextlib import asynccontextmanager
+import logging
 
-# Import services
-from app.services.stt_service import STTService
-from app.services.llm_service import LLMService  
-from app.services.tts_service import TTSService
-from app.services.chat_service import ChatService
-from app.services.skills.skill_manager import SkillManager
+from .config import Config
+from .services.stt_service import STTService
+from .services.tts_service import TTSService
+from .services.llm_service import LLMService
+from .services.chat_service import ChatService
+from .services.skills.skill_manager import SkillManager
 from app.config import Config
 
 # AssemblyAI Streaming imports (v3 Universal-Streaming)
@@ -39,6 +41,14 @@ from .schemas import (
     TTSRequest, TTSResponse, TranscriptionResponse, LLMRequest, LLMResponse,
     VoiceAgentResponse, ErrorResponse, ChatHistoryResponse
 )
+
+# Day 27: API Configuration Models
+class APIKeyRequest(BaseModel):
+    service: str
+    api_key: str
+
+class APIKeysRequest(BaseModel):
+    api_keys: Dict[str, str]
 
 logger = logging.getLogger(__name__)
 
@@ -1020,10 +1030,16 @@ async def transcribe_stream_websocket(websocket: WebSocket):
         )
     
     try:
-        # Create streaming client
+        # Create streaming client with current API key
+        current_api_key = Config.get_api_key("ASSEMBLYAI")
+        logger.info(f"Day 17: Creating StreamingClient with key: {current_api_key[:8] if current_api_key else 'None'}...")
+        
+        if not current_api_key:
+            raise ValueError("AssemblyAI API key not configured")
+            
         streaming_client = StreamingClient(
             StreamingClientOptions(
-                api_key=Config.ASSEMBLYAI_API_KEY,
+                api_key=current_api_key,
                 api_host="streaming.assemblyai.com"
             )
         )
@@ -1326,10 +1342,16 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
     def create_streaming_client():
         """Create a new StreamingClient instance for each recording session."""
         try:
-            logger.info("Day 23: Creating new StreamingClient...")
+            # Get the current API key (checks runtime keys first, then environment)
+            current_api_key = Config.get_api_key("ASSEMBLYAI")
+            logger.info(f"Day 23: Creating new StreamingClient with key: {current_api_key[:8] if current_api_key else 'None'}...")
+            
+            if not current_api_key:
+                raise ValueError("AssemblyAI API key not configured")
+            
             client = StreamingClient(
                 StreamingClientOptions(
-                    api_key=Config.ASSEMBLYAI_API_KEY,
+                    api_key=current_api_key,
                     api_host="streaming.assemblyai.com"
                 )
             )
@@ -1614,22 +1636,348 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
             pass
 
 
+# Day 27: API Configuration Endpoints
+@app.get("/api/config/status")
+async def get_api_status():
+    """Get status of all API keys."""
+    return Config.get_api_status()
+
+@app.get("/api/debug/env")
+async def debug_env():
+    """Debug endpoint to check environment variables."""
+    import os
+    env_vars = {
+        'ASSEMBLYAI_API_KEY': '✓' if os.getenv('ASSEMBLYAI_API_KEY') else '✗',
+        'MURF_API_KEY': '✓' if os.getenv('MURF_API_KEY') else '✗',
+        'GEMINI_API_KEY': '✓' if os.getenv('GEMINI_API_KEY') else '✗',
+        'TAVILY_API_KEY': '✓' if os.getenv('TAVILY_API_KEY') else '✗',
+        'OPENWEATHER_API_KEY': '✓' if os.getenv('OPENWEATHER_API_KEY') else '✗',
+        'NEWS_API_KEY': '✓' if os.getenv('NEWS_API_KEY') else '✗',
+        'GOOGLE_TRANSLATE_API_KEY': '✓' if os.getenv('GOOGLE_TRANSLATE_API_KEY') else '✗',
+    }
+    return {
+        'env_file_path': str(Config.BASE_DIR / '.env'),
+        'env_file_exists': (Config.BASE_DIR / '.env').exists(),
+        'environment_variables': env_vars,
+        'runtime_keys': list(Config._runtime_api_keys.keys())
+    }
+
+@app.post("/api/config/key")
+async def set_api_key(request: APIKeyRequest):
+    """Set a single API key."""
+    try:
+        logger.info(f"🔧 API Key Update Request - Service: {request.service}, Key: {request.api_key[:8]}...")
+        
+        # Set the API key
+        Config.set_api_key(request.service, request.api_key)
+        logger.info(f"✅ API key stored for {request.service}")
+        
+        # Verify the key was stored correctly
+        stored_key = Config.get_api_key(request.service)
+        logger.info(f"🔍 Verification - Stored key for {request.service}: {stored_key[:8] if stored_key else 'None'}...")
+        
+        # Reinitialize services when API keys are updated
+        logger.info("🔄 Starting service reinitialization...")
+        await reinitialize_services()
+        logger.info("✅ Service reinitialization completed")
+        
+        return {"success": True, "message": f"API key for {request.service} updated and services reinitialized"}
+    except Exception as e:
+        logger.error(f"❌ Error setting API key for {request.service}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/config/reinitialize")
+async def force_reinitialize_services():
+    """Force reinitialize all services with current API keys."""
+    try:
+        await reinitialize_services()
+        return {"success": True, "message": "All services reinitialized successfully"}
+    except Exception as e:
+        logger.error(f"Error reinitializing services: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def reinitialize_services():
+    """Reinitialize services when API keys are updated."""
+    global stt_service, tts_service, llm_service, skill_manager
+    
+    try:
+        logger.info("🔄 === STARTING SERVICE REINITIALIZATION ===")
+        
+        # Reinitialize STT service
+        assemblyai_key = Config.get_api_key("ASSEMBLYAI")
+        logger.info(f"🔍 AssemblyAI key retrieved: {assemblyai_key[:8] if assemblyai_key else 'None'}...")
+        if assemblyai_key:
+            from .services.stt_service import STTService
+            old_service = stt_service if 'stt_service' in globals() else None
+            logger.info(f"🗑️ Old STT service: {type(old_service).__name__ if old_service else 'None'}")
+            stt_service = STTService(assemblyai_key)
+            logger.info(f"✅ NEW STT service created: {type(stt_service).__name__} with key {assemblyai_key[:8]}...")
+        else:
+            logger.warning("⚠️ No AssemblyAI key found, STT service not reinitialized")
+        
+        # Reinitialize TTS service
+        murf_key = Config.get_api_key("MURF")
+        logger.info(f"🔍 Murf key retrieved: {murf_key[:8] if murf_key else 'None'}...")
+        if murf_key:
+            from .services.tts_service import TTSService
+            old_service = tts_service if 'tts_service' in globals() else None
+            logger.info(f"🗑️ Old TTS service: {type(old_service).__name__ if old_service else 'None'}")
+            tts_service = TTSService(murf_key)
+            logger.info(f"✅ NEW TTS service created: {type(tts_service).__name__} with key {murf_key[:8]}...")
+        else:
+            logger.warning("⚠️ No Murf key found, TTS service not reinitialized")
+        
+        # Reinitialize skill manager first
+        logger.info("🔄 Reinitializing Skill Manager...")
+        from .services.skills.skill_manager import SkillManager
+        skill_manager = SkillManager(
+            tavily_api_key=Config.get_api_key("TAVILY"),
+            weather_api_key=Config.get_api_key("OPENWEATHER"),
+            news_api_key=Config.get_api_key("NEWS"),
+            translate_api_key=Config.get_api_key("GOOGLE_TRANSLATE")
+        )
+        logger.info("🏴‍☠️ Skill Manager reinitialized")
+        
+        # Reinitialize LLM service with skill manager
+        gemini_key = Config.get_api_key("GEMINI")
+        logger.info(f"🔍 Gemini key retrieved: {gemini_key[:8] if gemini_key else 'None'}...")
+        if gemini_key:
+            from .services.llm_service import LLMService
+            old_service = llm_service if 'llm_service' in globals() else None
+            logger.info(f"🗑️ Old LLM service: {type(old_service).__name__ if old_service else 'None'}")
+            llm_service = LLMService(gemini_key, skill_manager=skill_manager)
+            logger.info(f"✅ NEW LLM service created: {type(llm_service).__name__} with key {gemini_key[:8]}...")
+        else:
+            logger.warning("⚠️ No Gemini key found, LLM service not reinitialized")
+        
+        logger.info("🎉 === SERVICE REINITIALIZATION COMPLETED ===")
+        
+    except Exception as e:
+        logger.error(f"❌ Error reinitializing services: {e}")
+        import traceback
+        logger.error(f"📋 Traceback: {traceback.format_exc()}")
+
+@app.post("/api/config/test")
+async def test_api_keys():
+    """Test all configured API keys."""
+    services = ['MURF', 'ASSEMBLYAI', 'GEMINI', 'TAVILY', 'OPENWEATHER', 'NEWS', 'GOOGLE_TRANSLATE']
+    results = {}
+    
+    for service in services:
+        api_key = Config.get_api_key(service)
+        service_lower = service.lower()
+        
+        if not api_key:
+            results[service_lower] = {
+                'status': 'missing',
+                'message': 'API key not configured'
+            }
+            continue
+        
+        # Basic validation - check if key looks valid
+        if len(api_key.strip()) < 10:
+            results[service_lower] = {
+                'status': 'error',
+                'message': 'API key appears to be too short'
+            }
+            continue
+        
+        # For now, just mark as valid if key exists and has reasonable length
+        # In a production app, you'd make actual API calls to test
+        results[service_lower] = {
+            'status': 'valid',
+            'message': 'API key configured and appears valid'
+        }
+    
+    return results
+
+@app.post("/api/config/keys")
+async def set_api_keys(request: APIKeysRequest):
+    """Set multiple API keys."""
+    try:
+        updated_services = []
+        for service, api_key in request.api_keys.items():
+            if api_key.strip():  # Only set non-empty keys
+                Config.set_api_key(service, api_key.strip())
+                updated_services.append(service)
+        
+        return {
+            "success": True, 
+            "message": f"Updated API keys for: {', '.join(updated_services)}",
+            "updated_services": updated_services
+        }
+    except Exception as e:
+        logger.error(f"Error setting API keys: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/config/test")
+async def test_api_keys():
+    """Test API key connectivity by making actual API calls when possible."""
+    import httpx
+    import google.generativeai as genai
+    from assemblyai import Transcriber
+    
+    results = {}
+    
+    async def test_assemblyai(key: str) -> dict:
+        """Test AssemblyAI API key by making a test request."""
+        try:
+            transcriber = Transcriber(api_key=key)
+            # Test with a small audio file or list models
+            models = transcriber.get_transcription_models()
+            if models and isinstance(models, list):
+                return {'status': 'valid', 'message': 'API key is valid'}
+            return {'status': 'error', 'message': 'Invalid API key'}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+    
+    async def test_gemini(key: str) -> dict:
+        """Test Gemini API key by initializing the client."""
+        try:
+            genai.configure(api_key=key)
+            # List available models as a test
+            models = genai.list_models()
+            if models:
+                return {'status': 'valid', 'message': 'API key is valid'}
+            return {'status': 'error', 'message': 'Invalid API key'}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+    
+    async def test_murf(key: str) -> dict:
+        """Test Murf API key by making a test request."""
+        try:
+            url = "https://api.murf.ai/v1/voices"
+            headers = {"api-key": key}
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=headers, timeout=10.0)
+                if response.status_code == 200:
+                    return {'status': 'valid', 'message': 'API key is valid'}
+                return {'status': 'error', 'message': f'API error: {response.status_code} {response.text}'}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+    
+    async def test_tavily(key: str) -> dict:
+        """Test Tavily API key by making a test search."""
+        try:
+            url = "https://api.tavily.com/search"
+            params = {"api_key": key, "query": "test", "search_depth": "basic", "include_answer": True}
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, params=params, timeout=10.0)
+                if response.status_code == 200:
+                    return {'status': 'valid', 'message': 'API key is valid'}
+                return {'status': 'error', 'message': f'API error: {response.status_code} {response.text}'}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+    
+    async def test_openweather(key: str) -> dict:
+        """Test OpenWeather API key by making a test request."""
+        try:
+            url = f"https://api.openweathermap.org/data/2.5/weather"
+            params = {"q": "London,UK", "appid": key, "units": "metric"}
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, params=params, timeout=10.0)
+                if response.status_code == 200:
+                    return {'status': 'valid', 'message': 'API key is valid'}
+                return {'status': 'error', 'message': f'API error: {response.status_code} {response.text}'}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+    
+    async def test_news(key: str) -> dict:
+        """Test NewsAPI key by making a test request."""
+        try:
+            url = f"https://newsapi.org/v2/top-headlines"
+            params = {"apiKey": key, "country": "us", "pageSize": 1}
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, params=params, timeout=10.0)
+                if response.status_code == 200:
+                    return {'status': 'valid', 'message': 'API key is valid'}
+                return {'status': 'error', 'message': f'API error: {response.status_code} {response.text}'}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+    
+    # Test all services concurrently
+    tasks = []
+    
+    # Test AssemblyAI
+    assemblyai_key = Config.get_api_key('ASSEMBLYAI')
+    if assemblyai_key:
+        tasks.append((test_assemblyai(assemblyai_key), 'assemblyai'))
+    else:
+        results['assemblyai'] = {'status': 'missing', 'message': 'API key not configured'}
+    
+    # Test Gemini
+    gemini_key = Config.get_api_key('GEMINI')
+    if gemini_key:
+        tasks.append((test_gemini(gemini_key), 'gemini'))
+    else:
+        results['gemini'] = {'status': 'missing', 'message': 'API key not configured'}
+    
+    # Test Murf
+    murf_key = Config.get_api_key('MURF')
+    if murf_key:
+        tasks.append((test_murf(murf_key), 'murf'))
+    else:
+        results['murf'] = {'status': 'missing', 'message': 'API key not configured'}
+    
+    # Test special skills
+    skill_tests = [
+        ('TAVILY', test_tavily, 'tavily'),
+        ('OPENWEATHER', test_openweather, 'openweather'),
+        ('NEWS', test_news, 'news'),
+    ]
+    
+    for service_key, test_func, service_name in skill_tests:
+        key = Config.get_api_key(service_key)
+        if key:
+            tasks.append((test_func(key), service_name))
+        else:
+            results[service_name] = {'status': 'missing', 'message': 'API key not configured'}
+    
+    # Google Translate (no easy test endpoint, just check if key exists)
+    translate_key = Config.get_api_key('GOOGLE_TRANSLATE')
+    if translate_key:
+        results['google_translate'] = {'status': 'valid', 'message': 'API key configured (not tested)'}
+    else:
+        results['google_translate'] = {'status': 'missing', 'message': 'API key not configured'}
+    
+    # Run all tests concurrently
+    if tasks:
+        test_coros, names = zip(*tasks)
+        test_results = await asyncio.gather(*test_coros, return_exceptions=True)
+        
+        for result, name in zip(test_results, names):
+            if isinstance(result, Exception):
+                results[name] = {'status': 'error', 'message': str(result)}
+            else:
+                results[name] = result
+    
+    return results
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
     services_status = {
-        "stt_service": stt_service.health_check() if stt_service else False,
-        "tts_service": tts_service.health_check() if tts_service else False,
-        "llm_service": llm_service.health_check() if llm_service else False,
-        "chat_service": True  # Chat service is always available
+        "stt": bool(Config.get_api_key('ASSEMBLYAI')),
+        "tts": bool(Config.get_api_key('MURF')),
+        "llm": bool(Config.get_api_key('GEMINI')),
+        "skills": {
+            "web_search": bool(Config.get_api_key('TAVILY')),
+            "weather": bool(Config.get_api_key('OPENWEATHER')),
+            "news": bool(Config.get_api_key('NEWS')),
+            "translation": bool(Config.get_api_key('GOOGLE_TRANSLATE'))
+        }
     }
     
-    all_healthy = all(services_status.values())
+    all_healthy = all([
+        services_status["stt"],
+        services_status["tts"], 
+        services_status["llm"]
+    ])
     
     return {
         "status": "healthy" if all_healthy else "degraded",
-        "services": services_status,
-        "timestamp": time.time()
+        "timestamp": time.time(),
+        "services": services_status
     }
 
 
