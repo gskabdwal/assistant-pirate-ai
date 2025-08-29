@@ -35,24 +35,29 @@ class Config:
     # Translation Skill API Key (Day 26)
     GOOGLE_TRANSLATE_API_KEY = os.getenv("GOOGLE_TRANSLATE_API_KEY")
     
-    # Runtime API keys (can be set by frontend)
-    _runtime_api_keys = {}
+    # Session-based API keys (per user session)
+    _session_api_keys = {}
     
     @classmethod
-    def set_api_key(cls, service: str, api_key: str) -> None:
-        """Set API key at runtime with basic validation."""
+    def set_api_key(cls, service: str, api_key: str, session_id: str = "default") -> None:
+        """Set API key at runtime with basic validation for specific session."""
         service_upper = service.upper()
+        
+        # Initialize session if not exists
+        if session_id not in cls._session_api_keys:
+            cls._session_api_keys[session_id] = {}
+        
         if api_key and api_key.strip():
             cleaned_key = api_key.strip()
             
             # Basic API key format validation
             if cls._validate_api_key_format(service_upper, cleaned_key):
-                cls._runtime_api_keys[service_upper] = cleaned_key
+                cls._session_api_keys[session_id][service_upper] = cleaned_key
             else:
                 raise ValueError(f"Invalid API key format for {service_upper}")
         else:
             # Remove the key if empty
-            cls._runtime_api_keys.pop(service_upper, None)
+            cls._session_api_keys[session_id].pop(service_upper, None)
     
     @classmethod
     def _validate_api_key_format(cls, service: str, api_key: str) -> bool:
@@ -88,13 +93,13 @@ class Config:
         return len(api_key) >= 10
     
     @classmethod
-    def get_api_key(cls, service: str) -> str:
-        """Get API key, prioritizing runtime keys over environment variables."""
+    def get_api_key(cls, service: str, session_id: str = "default") -> str:
+        """Get API key, prioritizing session keys over environment variables."""
         service_upper = service.upper()
         
-        # Check runtime keys first
-        if service_upper in cls._runtime_api_keys:
-            return cls._runtime_api_keys[service_upper]
+        # Check session-specific keys first
+        if session_id in cls._session_api_keys and service_upper in cls._session_api_keys[session_id]:
+            return cls._session_api_keys[session_id][service_upper]
         
         # Fallback to environment variables
         env_key_map = {
@@ -110,29 +115,38 @@ class Config:
         return env_key_map.get(service_upper, '')
     
     @classmethod
-    def get_api_status(cls) -> dict:
-        """Get status of all API keys."""
+    def get_api_status(cls, session_id: str = "default") -> dict:
+        """Get status of all API keys for specific session."""
         services = ['MURF', 'ASSEMBLYAI', 'GEMINI', 'TAVILY', 'OPENWEATHER', 'NEWS', 'GOOGLE_TRANSLATE']
         status = {}
         
         # Debug logging
         print("🔍 DEBUG: Checking API key status...")
-        print(f"🔍 Runtime keys: {list(cls._runtime_api_keys.keys())}")
+        session_keys = cls._session_api_keys.get(session_id, {})
+        print(f"🔍 Session {session_id} keys: {list(session_keys.keys())}")
         
         for service in services:
-            api_key = cls.get_api_key(service)
+            api_key = cls.get_api_key(service, session_id)
             env_key = os.getenv(f"{service}_API_KEY")
             
             # Debug logging for each service
-            print(f"🔍 {service}: runtime={service in cls._runtime_api_keys}, env_key={'✓' if env_key else '✗'}, final_key={'✓' if api_key else '✗'}")
+            has_session_key = service in session_keys
+            print(f"🔍 {service}: session={has_session_key}, env_key={'✓' if env_key else '✗'}, final_key={'✓' if api_key else '✗'}")
             
             status[service.lower()] = {
                 'configured': bool(api_key),
-                'source': 'runtime' if service in cls._runtime_api_keys else 'environment',
+                'source': 'session' if has_session_key else 'environment',
                 'api_key': api_key  # Include the actual API key (will be masked on frontend)
             }
         
         return status
+    
+    @classmethod
+    def clear_session_keys(cls, session_id: str) -> None:
+        """Clear all API keys for a specific session."""
+        if session_id in cls._session_api_keys:
+            del cls._session_api_keys[session_id]
+            print(f"🗑️ Cleared API keys for session: {session_id}")
     
     # Application settings
     APP_TITLE = "AI Voice Agent"

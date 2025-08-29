@@ -14,6 +14,38 @@ let apiConfigSidebar = null;
 let apiKeyInputs = {};
 let apiStatusIndicators = {};
 
+// Session management
+function generateSessionId() {
+    return 'session_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+}
+
+// Clear current session API keys
+async function clearSessionKeys() {
+    try {
+        const response = await fetch(`/api/config/session/${sessionId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showNotification('Session API keys cleared', 'success');
+            // Clear the input fields
+            Object.values(apiKeyInputs).forEach(input => {
+                if (input) {
+                    input.value = '';
+                    input.dataset.hadValue = 'false';
+                }
+            });
+            // Reload status
+            await loadAPIStatus();
+        } else {
+            throw new Error('Failed to clear session keys');
+        }
+    } catch (error) {
+        console.error('Error clearing session keys:', error);
+        showNotification('Error clearing session keys', 'error');
+    }
+}
+
 // Streaming transcription variables
 let transcribeWebSocket;
 let streamMediaRecorder;
@@ -82,7 +114,7 @@ function getOrCreateSessionId() {
     let sessionId = urlParams.get('session_id');
     
     if (!sessionId) {
-        sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        sessionId = generateSessionId();
         const newUrl = new URL(window.location);
         newUrl.searchParams.set('session_id', sessionId);
         window.history.replaceState({}, '', newUrl);
@@ -198,9 +230,10 @@ function connectAudioWebSocket() {
 }
 
 // Streaming Transcription Functions
-function connectTranscribeWebSocket() {
+function connectTranscriptionWebSocket() {
+    const sessionId = getOrCreateSessionId();
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/transcribe-stream`;
+    const wsUrl = `${protocol}//${window.location.host}/ws/transcribe-stream?session_id=${sessionId}`;
     
     transcribeWebSocket = new WebSocket(wsUrl);
     
@@ -364,7 +397,7 @@ async function startStreamRecording() {
         }
         
         // Create new WebSocket connection
-        connectTranscribeWebSocket();
+        connectTranscriptionWebSocket();
         
         // Wait for connection with timeout
         await new Promise((resolve, reject) => {
@@ -561,7 +594,7 @@ function stopStreamRecording() {
 // Day 21: Connect to Base64 Audio Streaming WebSocket
 function connectBase64AudioWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/audio-stream-base64`;
+    const wsUrl = `${protocol}//${window.location.host}/ws/audio-stream-base64?session_id=${sessionId}`;
     
     base64AudioWebSocket = new WebSocket(wsUrl);
     
@@ -731,7 +764,7 @@ function sendBase64StreamingRequest(text) {
 // Day 22: Streaming Audio Playback Functions
 function connectStreamingAudioWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/audio-stream-base64`;
+    const wsUrl = `${protocol}//${window.location.host}/ws/audio-stream?session_id=${sessionId}`;
     
     streamingAudioWebSocket = new WebSocket(wsUrl);
     
@@ -1856,7 +1889,7 @@ function initApp() {
         setTimeout(() => {
             console.log('Initializing WebSocket connections...');
             connectAudioWebSocket();
-            connectTranscribeWebSocket();
+            connectTranscriptionWebSocket();
             connectLLMWebSocket();
             connectBase64AudioWebSocket(); // Day 21: Initialize base64 audio WebSocket
             connectStreamingAudioWebSocket(); // Day 22: Initialize streaming audio WebSocket
@@ -1879,7 +1912,7 @@ function initApp() {
 function connectCompleteVoiceWebSocket() {
     try {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/complete-voice-agent`;
+        const wsUrl = `${protocol}//${window.location.host}/ws/complete-voice-agent?session_id=${sessionId}`;
         
         console.log('🤖 Day 23: Connecting to Complete Voice Agent WebSocket:', wsUrl);
         console.log('🤖 Day 23: Protocol:', protocol, 'Host:', window.location.host);
@@ -3111,6 +3144,13 @@ function initAPIConfiguration() {
         console.warn('Test config button not found');
     }
     
+    const clearSessionBtn = document.getElementById('clear-session');
+    if (clearSessionBtn) {
+        clearSessionBtn.addEventListener('click', clearSessionKeys);
+    } else {
+        console.warn('Clear session button not found');
+    }
+    
     const resetBtn = document.getElementById('reset-config');
     if (resetBtn) {
         resetBtn.addEventListener('click', resetAPIKeys);
@@ -3157,7 +3197,7 @@ function closeAPIConfig() {
 async function loadAPIStatus() {
     try {
         console.log('Loading API status...');
-        const response = await fetch('/api/config/status');
+        const response = await fetch(`/api/config/status?session_id=${sessionId}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -3261,7 +3301,7 @@ async function saveAPIKeys() {
         // Save each API key individually
         for (const [service, apiKey] of Object.entries(apiKeys)) {
             try {
-                const response = await fetch('/api/config/key', {
+                const response = await fetch(`/api/config/key?session_id=${sessionId}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3304,7 +3344,7 @@ async function saveAPIKeys() {
             if (input && !input.value.trim() && input.dataset.hadValue === 'true') {
                 // This field was cleared, send empty key to remove it
                 try {
-                    const response = await fetch('/api/config/key', {
+                    const response = await fetch(`/api/config/key?session_id=${sessionId}`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -3352,7 +3392,7 @@ async function testAPIKeys() {
     showNotification('Testing API keys...', 'info');
     
     try {
-        const response = await fetch('/api/config/test', {
+        const response = await fetch(`/api/config/test?session_id=${sessionId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

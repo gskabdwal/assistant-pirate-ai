@@ -56,7 +56,11 @@ logger = logging.getLogger(__name__)
 async def stream_murf_tts_websocket(client_websocket: WebSocket, text: str, voice_id: str, session_id: str):
     """Stream TTS audio from Murf WebSocket API directly to client"""
     try:
-        murf_ws_url = f"wss://api.murf.ai/v1/speech/stream-input?api-key={Config.MURF_API_KEY}"
+        murf_api_key = Config.get_api_key("MURF", session_id)
+        if not murf_api_key:
+            raise ValueError(f"Murf API key not configured for session {session_id}")
+        
+        murf_ws_url = f"wss://api.murf.ai/v1/speech/stream-input?api-key={murf_api_key}"
         
         async with websockets.connect(murf_ws_url) as murf_ws:
             # Send voice config first
@@ -807,15 +811,42 @@ async def audio_stream_base64_websocket(websocket: WebSocket):
     Enhanced to handle client disconnections and reconnections properly.
     """
     await websocket.accept()
+    
+    # Extract session_id from query parameters
+    session_id = websocket.query_params.get("session_id", "default")
     # logger.info(f"Day 22: Streaming audio WebSocket connection established from {websocket.client}")
     
-    # Get dependencies
+    # Initialize session-based services for base64 audio streaming
     try:
-        llm = get_llm_service()
-        tts = get_tts_service()
-        chat = get_chat_service()
-    except HTTPException as e:
-        await websocket.close(code=1011, reason=e.detail)
+        from .services.llm_service import LLMService
+        from .services.tts_service import TTSService
+        from .services.chat_service import ChatService
+        from .services.skills.skill_manager import SkillManager
+        
+        # Get session-based API keys
+        gemini_key = Config.get_api_key("GEMINI", session_id)
+        murf_key = Config.get_api_key("MURF", session_id)
+        
+        if not gemini_key:
+            raise ValueError(f"Gemini API key not configured for session {session_id}")
+        if not murf_key:
+            raise ValueError(f"Murf API key not configured for session {session_id}")
+        
+        # Initialize services with session keys
+        skill_manager = SkillManager(
+            tavily_api_key=Config.get_api_key("TAVILY", session_id),
+            weather_api_key=Config.get_api_key("OPENWEATHER", session_id),
+            news_api_key=Config.get_api_key("NEWS", session_id),
+            translate_api_key=Config.get_api_key("GOOGLE_TRANSLATE", session_id)
+        )
+        
+        llm = LLMService(gemini_key, skill_manager)
+        tts = TTSService(murf_key)
+        chat = ChatService()
+        
+    except Exception as e:
+        error_msg = f"Service initialization failed for session {session_id}: {str(e)}"
+        await websocket.close(code=1011, reason=error_msg)
         return
     
     try:
@@ -975,11 +1006,15 @@ async def transcribe_stream_websocket(websocket: WebSocket):
     Receives binary audio chunks and streams transcription results.
     """
     await websocket.accept()
-    logger.info(f"Transcription stream WebSocket connection established from {websocket.client}")
     
-    if not Config.ASSEMBLYAI_API_KEY:
+    # Extract session_id from query parameters
+    session_id = websocket.query_params.get("session_id", "default")
+    logger.info(f"Transcription stream WebSocket connection established from {websocket.client} for session {session_id}")
+    
+    assemblyai_key = Config.get_api_key("ASSEMBLYAI", session_id)
+    if not assemblyai_key:
         await websocket.send_text(json.dumps({
-            "error": "AssemblyAI API key not configured"
+            "error": f"AssemblyAI API key not configured for session {session_id}"
         }))
         await websocket.close()
         return
@@ -1030,16 +1065,15 @@ async def transcribe_stream_websocket(websocket: WebSocket):
         )
     
     try:
-        # Create streaming client with current API key
-        current_api_key = Config.get_api_key("ASSEMBLYAI")
-        logger.info(f"Day 17: Creating StreamingClient with key: {current_api_key[:8] if current_api_key else 'None'}...")
+        # Create streaming client with session API key
+        logger.info(f"Day 17: Creating StreamingClient with key: {assemblyai_key[:8] if assemblyai_key else 'None'}... (session: {session_id})")
         
-        if not current_api_key:
-            raise ValueError("AssemblyAI API key not configured")
+        if not assemblyai_key:
+            raise ValueError(f"AssemblyAI API key not configured for session {session_id}")
             
         streaming_client = StreamingClient(
             StreamingClientOptions(
-                api_key=current_api_key,
+                api_key=assemblyai_key,
                 api_host="streaming.assemblyai.com"
             )
         )
@@ -1166,9 +1200,12 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
     """
     # Accept with ping interval to prevent timeout
     await websocket.accept()
-    logger.info(f"Day 23: Complete Voice Agent WebSocket connection established from {websocket.client}")
     
-    # Start keepalive task to prevent ping timeout
+    # Extract session_id from query parameters
+    session_id = websocket.query_params.get("session_id", "default")
+    logger.info(f"Day 23: Complete Voice Agent WebSocket connection established from {websocket.client} for session {session_id}")
+    
+    # Start keepalive task to prevent timeout
     keepalive_task = None
     
     async def keepalive():
@@ -1189,24 +1226,52 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
     
     keepalive_task = asyncio.create_task(keepalive())
     
-    # Get dependencies
+    # Initialize session-based services
     try:
-        logger.info("Day 23: Initializing services...")
-        stt = get_stt_service()
-        logger.info("Day 23: STT service obtained")
-        tts = get_tts_service()
-        logger.info("Day 23: TTS service obtained")
-        llm = get_llm_service()
-        logger.info("Day 23: LLM service obtained")
-        chat = get_chat_service()
-        logger.info("Day 23: Chat service obtained")
-    except HTTPException as e:
-        logger.error(f"Day 23: Service initialization failed: {e.detail}")
-        await websocket.close(code=1011, reason=e.detail)
-        return
+        logger.info(f"Day 23: Initializing services for session {session_id}...")
+        
+        # Initialize services with session-based API keys
+        from .services.stt_service import STTService
+        from .services.tts_service import TTSService
+        from .services.llm_service import LLMService
+        from .services.chat_service import ChatService
+        
+        # Get session-based API keys
+        assemblyai_key = Config.get_api_key("ASSEMBLYAI", session_id)
+        murf_key = Config.get_api_key("MURF", session_id)
+        gemini_key = Config.get_api_key("GEMINI", session_id)
+        
+        logger.info(f"Day 23: Retrieved API keys - AssemblyAI: {'✓' if assemblyai_key else '✗'}, Murf: {'✓' if murf_key else '✗'}, Gemini: {'✓' if gemini_key else '✗'}")
+        
+        if not assemblyai_key:
+            raise ValueError(f"AssemblyAI API key not configured for session {session_id}")
+        if not murf_key:
+            raise ValueError(f"Murf API key not configured for session {session_id}")
+        if not gemini_key:
+            raise ValueError(f"Gemini API key not configured for session {session_id}")
+        
+        # Initialize services
+        stt = STTService(assemblyai_key)
+        tts = TTSService(murf_key)
+        
+        # Initialize skill manager with session keys
+        from .services.skills.skill_manager import SkillManager
+        skill_manager = SkillManager(
+            tavily_api_key=Config.get_api_key("TAVILY", session_id),
+            weather_api_key=Config.get_api_key("OPENWEATHER", session_id),
+            news_api_key=Config.get_api_key("NEWS", session_id),
+            translate_api_key=Config.get_api_key("GOOGLE_TRANSLATE", session_id)
+        )
+        
+        llm = LLMService(gemini_key, skill_manager)
+        chat = ChatService()
+        
+        logger.info(f"Day 23: All services initialized for session {session_id}")
+        
     except Exception as e:
-        logger.error(f"Day 23: Unexpected error during service initialization: {str(e)}")
-        await websocket.close(code=1011, reason=str(e))
+        error_msg = f"Service initialization failed for session {session_id}: {str(e)}"
+        logger.error(f"Day 23: {error_msg}")
+        await websocket.close(code=1011, reason=error_msg)
         return
     
     # AssemblyAI streaming client - will be created per session
@@ -1219,7 +1284,6 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
     is_recording = False
     is_processing = False
     accumulated_transcript = ""
-    session_id = None
     streaming_client = None
     last_final_transcript = ""
     final_transcript_timer = None
@@ -1342,12 +1406,12 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
     def create_streaming_client():
         """Create a new StreamingClient instance for each recording session."""
         try:
-            # Get the current API key (checks runtime keys first, then environment)
-            current_api_key = Config.get_api_key("ASSEMBLYAI")
-            logger.info(f"Day 23: Creating new StreamingClient with key: {current_api_key[:8] if current_api_key else 'None'}...")
+            # Get the current API key for this session
+            current_api_key = Config.get_api_key("ASSEMBLYAI", session_id)
+            logger.info(f"Day 23: Creating new StreamingClient with key: {current_api_key[:8] if current_api_key else 'None'}... (session: {session_id})")
             
             if not current_api_key:
-                raise ValueError("AssemblyAI API key not configured")
+                raise ValueError(f"AssemblyAI API key not configured for session {session_id}")
             
             client = StreamingClient(
                 StreamingClientOptions(
@@ -1561,8 +1625,8 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
                             # No need for duplicate processing here.
                             
                         elif message_type == "clear_chat":
-                            session_id = data.get("session_id", "default")
-                            chat.clear_history(session_id)
+                            chat_session_id = data.get("session_id", session_id)
+                            chat.clear_history(chat_session_id)
                             
                             await websocket.send_text(json.dumps({
                                 "type": "chat_history",
@@ -1638,9 +1702,9 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
 
 # Day 27: API Configuration Endpoints
 @app.get("/api/config/status")
-async def get_api_status():
-    """Get status of all API keys."""
-    return Config.get_api_status()
+async def get_api_status(session_id: str = "default"):
+    """Get status of all API keys for specific session."""
+    return Config.get_api_status(session_id)
 
 @app.get("/api/debug/env")
 async def debug_env():
@@ -1663,22 +1727,22 @@ async def debug_env():
     }
 
 @app.post("/api/config/key")
-async def set_api_key(request: APIKeyRequest):
-    """Set a single API key."""
+async def set_api_key(request: APIKeyRequest, session_id: str = "default"):
+    """Set a single API key for specific session."""
     try:
-        logger.info(f"🔧 API Key Update Request - Service: {request.service}, Key: {request.api_key[:8]}...")
+        logger.info(f"🔧 API Key Update Request - Service: {request.service}, Key: {request.api_key[:8]}... (session: {session_id})")
         
-        # Set the API key
-        Config.set_api_key(request.service, request.api_key)
-        logger.info(f"✅ API key stored for {request.service}")
+        # Set the API key for this session
+        Config.set_api_key(request.service, request.api_key, session_id)
+        logger.info(f"✅ API key stored for {request.service} (session: {session_id})")
         
         # Verify the key was stored correctly
-        stored_key = Config.get_api_key(request.service)
-        logger.info(f"🔍 Verification - Stored key for {request.service}: {stored_key[:8] if stored_key else 'None'}...")
+        stored_key = Config.get_api_key(request.service, session_id)
+        logger.info(f"🔍 Verification - Stored key for {request.service}: {stored_key[:8] if stored_key else 'None'}... (session: {session_id})")
         
         # Reinitialize services when API keys are updated
         logger.info("🔄 Starting service reinitialization...")
-        await reinitialize_services()
+        await reinitialize_services(session_id)
         logger.info("✅ Service reinitialization completed")
         
         return {"success": True, "message": f"API key for {request.service} updated and services reinitialized"}
@@ -1696,15 +1760,19 @@ async def force_reinitialize_services():
         logger.error(f"Error reinitializing services: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-async def reinitialize_services():
+async def reinitialize_services(session_id: str = "default"):
     """Reinitialize services when API keys are updated."""
     global stt_service, tts_service, llm_service, skill_manager
     
     try:
         logger.info("🔄 === STARTING SERVICE REINITIALIZATION ===")
         
+        # Note: Services are now session-aware and initialized per request
+        # Global service reinitialization is no longer needed
+        logger.info("🔄 Session-based services - no global reinitialization needed")
+        
         # Reinitialize STT service
-        assemblyai_key = Config.get_api_key("ASSEMBLYAI")
+        assemblyai_key = Config.get_api_key("ASSEMBLYAI", session_id)
         logger.info(f"🔍 AssemblyAI key retrieved: {assemblyai_key[:8] if assemblyai_key else 'None'}...")
         if assemblyai_key:
             from .services.stt_service import STTService
@@ -1716,7 +1784,7 @@ async def reinitialize_services():
             logger.warning("⚠️ No AssemblyAI key found, STT service not reinitialized")
         
         # Reinitialize TTS service
-        murf_key = Config.get_api_key("MURF")
+        murf_key = Config.get_api_key("MURF", session_id)
         logger.info(f"🔍 Murf key retrieved: {murf_key[:8] if murf_key else 'None'}...")
         if murf_key:
             from .services.tts_service import TTSService
@@ -1731,15 +1799,15 @@ async def reinitialize_services():
         logger.info("🔄 Reinitializing Skill Manager...")
         from .services.skills.skill_manager import SkillManager
         skill_manager = SkillManager(
-            tavily_api_key=Config.get_api_key("TAVILY"),
-            weather_api_key=Config.get_api_key("OPENWEATHER"),
-            news_api_key=Config.get_api_key("NEWS"),
-            translate_api_key=Config.get_api_key("GOOGLE_TRANSLATE")
+            tavily_api_key=Config.get_api_key("TAVILY", session_id),
+            weather_api_key=Config.get_api_key("OPENWEATHER", session_id),
+            news_api_key=Config.get_api_key("NEWS", session_id),
+            translate_api_key=Config.get_api_key("GOOGLE_TRANSLATE", session_id)
         )
         logger.info("🏴‍☠️ Skill Manager reinitialized")
         
         # Reinitialize LLM service with skill manager
-        gemini_key = Config.get_api_key("GEMINI")
+        gemini_key = Config.get_api_key("GEMINI", session_id)
         logger.info(f"🔍 Gemini key retrieved: {gemini_key[:8] if gemini_key else 'None'}...")
         if gemini_key:
             from .services.llm_service import LLMService
@@ -1757,14 +1825,24 @@ async def reinitialize_services():
         import traceback
         logger.error(f"📋 Traceback: {traceback.format_exc()}")
 
+@app.delete("/api/config/session/{session_id}")
+async def clear_session_keys(session_id: str):
+    """Clear all API keys for a specific session."""
+    try:
+        Config.clear_session_keys(session_id)
+        return {"success": True, "message": f"Cleared API keys for session {session_id}"}
+    except Exception as e:
+        logger.error(f"Error clearing session keys: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
 @app.post("/api/config/test")
-async def test_api_keys():
-    """Test all configured API keys."""
+async def test_api_keys(session_id: str = "default"):
+    """Test all configured API keys for specific session."""
     services = ['MURF', 'ASSEMBLYAI', 'GEMINI', 'TAVILY', 'OPENWEATHER', 'NEWS', 'GOOGLE_TRANSLATE']
     results = {}
     
     for service in services:
-        api_key = Config.get_api_key(service)
+        api_key = Config.get_api_key(service, session_id)
         service_lower = service.lower()
         
         if not api_key:
@@ -1786,29 +1864,10 @@ async def test_api_keys():
         # In a production app, you'd make actual API calls to test
         results[service_lower] = {
             'status': 'valid',
-            'message': 'API key configured and appears valid'
+            'message': 'API key format appears valid'
         }
     
     return results
-
-@app.post("/api/config/keys")
-async def set_api_keys(request: APIKeysRequest):
-    """Set multiple API keys."""
-    try:
-        updated_services = []
-        for service, api_key in request.api_keys.items():
-            if api_key.strip():  # Only set non-empty keys
-                Config.set_api_key(service, api_key.strip())
-                updated_services.append(service)
-        
-        return {
-            "success": True, 
-            "message": f"Updated API keys for: {', '.join(updated_services)}",
-            "updated_services": updated_services
-        }
-    except Exception as e:
-        logger.error(f"Error setting API keys: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/api/config/test")
 async def test_api_keys():

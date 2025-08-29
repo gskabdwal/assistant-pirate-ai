@@ -13,14 +13,16 @@ sys.path.insert(0, str(Path(__file__).parent / "app"))
 from app.config import Config
 from app.services.skills.skill_manager import SkillManager
 
-async def test_weather_skill():
+async def test_weather_skill(session_id="default"):
     """Test weather skill functionality."""
     print("🌤️ Testing Weather Skill...")
     
     # Check if API key is configured (runtime or environment)
-    weather_key = Config.get_api_key("OPENWEATHER")
+    weather_key = Config.get_api_key("OPENWEATHER", session_id)
     if not weather_key:
-        print("❌ OPENWEATHER_API_KEY not configured")
+        print(f"❌ OPENWEATHER_API_KEY not configured for session {session_id}")
+        print(f"   Session keys: {Config._session_api_keys.get(session_id, {})}")
+        print(f"   Env key: {Config.OPENWEATHER_API_KEY}")
         return False
     
     print(f"✅ Weather API key found: {weather_key[:8]}...")
@@ -37,23 +39,26 @@ async def test_weather_skill():
     
     print("✅ Weather skill loaded successfully")
     
-    # Test weather query
+    # Test weather query with detailed error logging
     try:
+        print("🔄 Executing weather skill...")
         result = await skill_manager.execute_skill("get_weather", location="London")
         print(f"✅ Weather result: {result[:200]}...")
         return True
     except Exception as e:
         print(f"❌ Weather skill error: {str(e)}")
+        import traceback
+        print(f"   Full traceback: {traceback.format_exc()}")
         return False
 
-async def test_web_search_skill():
+async def test_web_search_skill(session_id="default"):
     """Test web search skill functionality."""
     print("🔍 Testing Web Search Skill...")
     
     # Check if API key is configured (runtime or environment)
-    tavily_key = Config.get_api_key("TAVILY")
+    tavily_key = Config.get_api_key("TAVILY", session_id)
     if not tavily_key:
-        print("❌ TAVILY_API_KEY not configured")
+        print(f"❌ TAVILY_API_KEY not configured for session {session_id}")
         return False
     
     print(f"✅ Tavily API key found: {tavily_key[:8]}...")
@@ -79,14 +84,14 @@ async def test_web_search_skill():
         print(f"❌ Web search skill error: {str(e)}")
         return False
 
-async def test_news_skill():
+async def test_news_skill(session_id="default"):
     """Test news skill functionality."""
     print("📰 Testing News Skill...")
     
     # Check if API key is configured (runtime or environment)
-    news_key = Config.get_api_key("NEWS")
+    news_key = Config.get_api_key("NEWS", session_id)
     if not news_key:
-        print("❌ NEWS_API_KEY not configured")
+        print(f"❌ NEWS_API_KEY not configured for session {session_id}")
         return False
     
     print(f"✅ News API key found: {news_key[:8]}...")
@@ -112,16 +117,16 @@ async def test_news_skill():
         print(f"❌ News skill error: {str(e)}")
         return False
 
-async def test_function_definitions():
+async def test_function_definitions(session_id="default"):
     """Test that function definitions are properly generated."""
     print("🔧 Testing Function Definitions...")
     
     # Initialize skill manager with all skills
     skill_manager = SkillManager(
-        tavily_api_key=Config.get_api_key("TAVILY"),
-        weather_api_key=Config.get_api_key("OPENWEATHER"),
-        news_api_key=Config.get_api_key("NEWS"),
-        translate_api_key=Config.get_api_key("GOOGLE_TRANSLATE")
+        tavily_api_key=Config.get_api_key("TAVILY", session_id),
+        weather_api_key=Config.get_api_key("OPENWEATHER", session_id),
+        news_api_key=Config.get_api_key("NEWS", session_id),
+        translate_api_key=Config.get_api_key("GOOGLE_TRANSLATE", session_id)
     )
     
     # Get function definitions
@@ -154,15 +159,25 @@ async def main():
     Config.setup_logging()
     Config.validate_config()
     
+    # Test with a test API key to see if the skill system works
+    test_session = "test_session"
+    
+    # Set test API keys for debugging (proper format)
+    print("🔧 Setting test API keys...")
+    Config.set_api_key("OPENWEATHER", "12345678901234567890123456789012", test_session)  # 32 chars alphanumeric
+    Config.set_api_key("TAVILY", "tvly-1234567890abcdef1234567890", test_session)  # Tavily format
+    Config.set_api_key("NEWS", "abcdef1234567890abcdef1234567890", test_session)  # 32 chars alphanumeric
+    Config.set_api_key("GOOGLE_TRANSLATE", "AIzaSyTest_translate_key_for_debugging_12345", test_session)
+    
     results = []
     
     # Test function definitions
-    results.append(await test_function_definitions())
+    results.append(await test_function_definitions(test_session))
     
-    # Test individual skills
-    results.append(await test_weather_skill())
-    results.append(await test_web_search_skill())
-    results.append(await test_news_skill())
+    # Test individual skills with test session
+    results.append(await test_weather_skill(test_session))
+    results.append(await test_web_search_skill(test_session))
+    results.append(await test_news_skill(test_session))
     
     print("\n" + "=" * 50)
     print(f"🏴‍☠️ Test Results: {sum(results)}/{len(results)} skills working")
@@ -171,10 +186,10 @@ async def main():
         print("✅ All skills are ready for adventure!")
     else:
         print("❌ Some skills need attention, matey!")
-        print("\n💡 Make sure to:")
-        print("1. Copy .env.example to .env")
-        print("2. Add your API keys to .env file")
-        print("3. Install dependencies: pip install -r requirements.txt")
+        print("\n💡 Issues found:")
+        print("1. Check API key configuration in the web interface")
+        print("2. Verify skill initialization in Complete Voice Agent")
+        print("3. Test with real API keys through the browser")
 
 if __name__ == "__main__":
     asyncio.run(main())
