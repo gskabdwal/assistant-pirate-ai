@@ -14,6 +14,14 @@ let isMobile = false;
 let mobileAudioContext = null;
 let mobileWebSocketRetryCount = 0;
 let maxMobileRetries = 3;
+let mobileDebugInfo = {
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    maxTouchPoints: navigator.maxTouchPoints,
+    isSecureContext: window.isSecureContext,
+    protocol: window.location.protocol,
+    host: window.location.host
+};
 
 // Day 27: API Configuration variables
 let apiConfigSidebar = null;
@@ -152,9 +160,18 @@ function connectAudioWebSocket() {
             audioWebSocket = null;
         }
 
+        // Enhanced WebSocket URL construction for deployment compatibility
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/audio-stream`;
+        const host = window.location.host;
+        const wsUrl = `${protocol}//${host}/ws/audio-stream`;
         
+        console.log('Audio WebSocket deployment info:', {
+            protocol: window.location.protocol,
+            host: host,
+            wsProtocol: protocol,
+            finalUrl: wsUrl,
+            isMobile: isMobile
+        });
         console.log('Connecting to WebSocket:', wsUrl);
         audioWebSocket = new WebSocket(wsUrl);
         
@@ -216,8 +233,18 @@ function connectAudioWebSocket() {
 // Streaming Transcription Functions
 function connectTranscriptionWebSocket() {
     const sessionId = getOrCreateSessionId();
+    // Enhanced WebSocket URL construction for deployment compatibility
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/transcribe-stream?session_id=${sessionId}`;
+    const host = window.location.host;
+    const wsUrl = `${protocol}//${host}/ws/transcribe-stream?session_id=${sessionId}`;
+    
+    console.log('Transcription WebSocket deployment info:', {
+        protocol: window.location.protocol,
+        host: host,
+        wsProtocol: protocol,
+        sessionId: sessionId,
+        finalUrl: wsUrl
+    });
     
     transcribeWebSocket = new WebSocket(wsUrl);
     
@@ -446,8 +473,18 @@ function stopStreamRecording() {
 // Day 21: Base64 Audio Streaming Functions
 function connectBase64AudioWebSocket() {
     try {
+        // Enhanced WebSocket URL construction for deployment compatibility
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/audio-stream-base64`;
+        const host = window.location.host;
+        const wsUrl = `${protocol}//${host}/ws/audio-stream-base64`;
+        
+        console.log('Base64 WebSocket deployment info:', {
+            protocol: window.location.protocol,
+            host: host,
+            wsProtocol: protocol,
+            finalUrl: wsUrl,
+            isMobile: isMobile
+        });
         
         base64AudioWs = new WebSocket(wsUrl);
         
@@ -538,8 +575,18 @@ function startBase64AudioStreaming() {
 // Day 22: Streaming Audio Playback Functions
 function connectStreamingAudioWebSocket() {
     try {
+        // Enhanced WebSocket URL construction for deployment compatibility
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/audio-stream-base64`;
+        const host = window.location.host;
+        const wsUrl = `${protocol}//${host}/ws/audio-stream-base64`;
+        
+        console.log('Streaming Audio WebSocket deployment info:', {
+            protocol: window.location.protocol,
+            host: host,
+            wsProtocol: protocol,
+            finalUrl: wsUrl,
+            isMobile: isMobile
+        });
         
         streamingAudioWs = new WebSocket(wsUrl);
         
@@ -2135,10 +2182,12 @@ function getMobileMediaRecorderOptions() {
 // Mobile-specific error handling and user feedback
 function showMobileError(message, fallbackAction = null) {
     console.error('Mobile error:', message);
+    console.log('Mobile debug info:', mobileDebugInfo);
     
-    // Show user-friendly mobile error message
+    // Show user-friendly mobile error message with debug info
+    const debugInfo = `Debug: ${mobileDebugInfo.userAgent.includes('Mobile') ? 'Mobile' : 'Desktop'} | ${mobileDebugInfo.protocol} | ${mobileDebugInfo.isSecureContext ? 'Secure' : 'Insecure'}`;
     const errorMsg = isMobile ? 
-        `Mobile Browser Issue: ${message}${fallbackAction ? ` Try: ${fallbackAction}` : ''}` : 
+        `Mobile Browser Issue: ${message}${fallbackAction ? ` Try: ${fallbackAction}` : ''}\n${debugInfo}` : 
         message;
     
     // Use notification system if available, otherwise alert
@@ -2147,6 +2196,15 @@ function showMobileError(message, fallbackAction = null) {
     } else {
         alert(errorMsg);
     }
+    
+    // Also log to console for debugging
+    console.log('Full mobile error context:', {
+        message,
+        fallbackAction,
+        isMobile,
+        debugInfo: mobileDebugInfo,
+        timestamp: new Date().toISOString()
+    });
 }
 
 // Mobile-specific getUserMedia with fallbacks
