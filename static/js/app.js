@@ -9,6 +9,12 @@ let isStreaming = false;
 let isLLMStreaming = false;
 let chatService = null; // Initialize chat service
 
+// Mobile-specific variables
+let isMobile = false;
+let mobileAudioContext = null;
+let mobileWebSocketRetryCount = 0;
+let maxMobileRetries = 3;
+
 // Day 27: API Configuration variables
 let apiConfigSidebar = null;
 let apiKeyInputs = {};
@@ -2034,23 +2040,186 @@ function clearCompleteVoiceChatHistory() {
     // conversationDisplay removed - using single chat history only
 }
 
+// Mobile touch detection
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+}
+
+// Mobile-specific audio context initialization
+function initMobileAudioContext() {
+    if (isMobile && !mobileAudioContext) {
+        try {
+            mobileAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Resume audio context on user interaction for mobile browsers
+            if (mobileAudioContext.state === 'suspended') {
+                document.addEventListener('touchstart', () => {
+                    mobileAudioContext.resume();
+                }, { once: true });
+            }
+            
+            console.log('Mobile audio context initialized:', mobileAudioContext.state);
+        } catch (error) {
+            console.error('Failed to initialize mobile audio context:', error);
+        }
+    }
+}
+
+// Mobile-specific WebSocket connection with retry logic
+function createMobileWebSocket(url, protocols = []) {
+    return new Promise((resolve, reject) => {
+        try {
+            const ws = new WebSocket(url, protocols);
+            
+            // Mobile-specific timeout handling
+            const connectionTimeout = setTimeout(() => {
+                ws.close();
+                reject(new Error('WebSocket connection timeout on mobile'));
+            }, isMobile ? 10000 : 5000); // Longer timeout for mobile
+            
+            ws.onopen = () => {
+                clearTimeout(connectionTimeout);
+                mobileWebSocketRetryCount = 0;
+                console.log('Mobile WebSocket connected successfully');
+                resolve(ws);
+            };
+            
+            ws.onerror = (error) => {
+                clearTimeout(connectionTimeout);
+                console.error('Mobile WebSocket error:', error);
+                
+                // Retry logic for mobile
+                if (isMobile && mobileWebSocketRetryCount < maxMobileRetries) {
+                    mobileWebSocketRetryCount++;
+                    console.log(`Retrying mobile WebSocket connection (${mobileWebSocketRetryCount}/${maxMobileRetries})`);
+                    setTimeout(() => {
+                        createMobileWebSocket(url, protocols).then(resolve).catch(reject);
+                    }, 2000 * mobileWebSocketRetryCount);
+                } else {
+                    reject(error);
+                }
+            };
+            
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+// Mobile-specific MediaRecorder configuration
+function getMobileMediaRecorderOptions() {
+    if (!isMobile) {
+        return { mimeType: 'audio/webm;codecs=opus' };
+    }
+    
+    // Mobile-specific codec preferences
+    const mobileCodecs = [
+        'audio/webm;codecs=opus',
+        'audio/mp4;codecs=mp4a.40.2',
+        'audio/mpeg',
+        'audio/wav'
+    ];
+    
+    for (const codec of mobileCodecs) {
+        if (MediaRecorder.isTypeSupported(codec)) {
+            console.log('Using mobile codec:', codec);
+            return { mimeType: codec };
+        }
+    }
+    
+    console.warn('No supported mobile codecs found, using default');
+    return {};
+}
+
+// Mobile-specific error handling and user feedback
+function showMobileError(message, fallbackAction = null) {
+    console.error('Mobile error:', message);
+    
+    // Show user-friendly mobile error message
+    const errorMsg = isMobile ? 
+        `Mobile Browser Issue: ${message}${fallbackAction ? ` Try: ${fallbackAction}` : ''}` : 
+        message;
+    
+    // Use notification system if available, otherwise alert
+    if (typeof showNotification === 'function') {
+        showNotification(errorMsg, 'error');
+    } else {
+        alert(errorMsg);
+    }
+}
+
+// Mobile-specific getUserMedia with fallbacks
+async function getMobileUserMedia(constraints) {
+    try {
+        // Standard getUserMedia
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            return await navigator.mediaDevices.getUserMedia(constraints);
+        }
+        
+        // Fallback for older mobile browsers
+        const getUserMedia = navigator.getUserMedia || 
+                           navigator.webkitGetUserMedia || 
+                           navigator.mozGetUserMedia || 
+                           navigator.msGetUserMedia;
+        
+        if (getUserMedia) {
+            return new Promise((resolve, reject) => {
+                getUserMedia.call(navigator, constraints, resolve, reject);
+            });
+        }
+        
+        throw new Error('getUserMedia not supported on this mobile browser');
+        
+    } catch (error) {
+        console.error('Mobile getUserMedia error:', error);
+        
+        // Provide mobile-specific error messages and solutions
+        if (error.name === 'NotAllowedError') {
+            showMobileError('Microphone access denied. Please enable microphone permissions in your browser settings.', 'Check browser permissions');
+        } else if (error.name === 'NotFoundError') {
+            showMobileError('No microphone found. Please check your device has a working microphone.', 'Try refreshing the page');
+        } else if (error.name === 'NotSupportedError') {
+            showMobileError('Audio recording not supported on this mobile browser.', 'Try using Chrome or Safari');
+        } else {
+            showMobileError(`Audio access failed: ${error.message}`, 'Try refreshing the page');
+        }
+        
+        throw error;
+    }
+}
+
+// Add both click and touch events for mobile compatibility
+function addMobileCompatibleEvent(element, callback) {
+    if (!element) return;
+    
+    // Add click event for all devices
+    element.addEventListener('click', callback);
+    
+    // Add touch events for mobile devices
+    if (isMobileDevice()) {
+        element.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            callback(e);
+        }, { passive: false });
+    }
+}
+
 // Set up all event listeners
 function setupEventListeners() {
     if (startLLMRecordingBtn) {
-        startLLMRecordingBtn.addEventListener('click', async (e) => {
+        addMobileCompatibleEvent(startLLMRecordingBtn, async (e) => {
             try {
                 await startLLMRecording();
             } catch (error) {
-                console.error('Error in startLLMRecording:', error);
-                if (llmStatus) {
-                    llmStatus.textContent = `Error: ${error.message}`;
-                }
+                console.error('Error starting LLM recording:', error);
+                updateLLMStatus('Error starting recording: ' + error.message);
             }
         });
     }
     
     if (stopLLMRecordingBtn) {
-        stopLLMRecordingBtn.addEventListener('click', () => {
+        addMobileCompatibleEvent(stopLLMRecordingBtn, () => {
             try {
                 stopLLMRecording();
             } catch (error) {
@@ -2064,7 +2233,7 @@ function setupEventListeners() {
     
     // Streaming transcription event listeners
     if (startStreamRecordingBtn) {
-        startStreamRecordingBtn.addEventListener('click', async (e) => {
+        addMobileCompatibleEvent(startStreamRecordingBtn, async (e) => {
             try {
                 await startStreamRecording();
             } catch (error) {
@@ -2724,6 +2893,24 @@ function getNotificationIcon(type) {
 
 // Wait for DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', () => {
+    // Detect mobile device
+    isMobile = isMobileDevice();
+    console.log('Mobile device detected:', isMobile);
+    
+    // Initialize mobile-specific features
+    if (isMobile) {
+        initMobileAudioContext();
+        
+        // Add mobile-specific viewport handling
+        const viewport = document.querySelector('meta[name="viewport"]');
+        if (viewport) {
+            viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+        }
+        
+        // Prevent zoom on input focus for iOS
+        document.addEventListener('touchstart', () => {}, { passive: true });
+    }
+    
     // Initialize LLM app
     initApp();
     
