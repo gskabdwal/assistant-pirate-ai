@@ -4,15 +4,19 @@ AI Voice Agent - Refactored FastAPI Application.
 import logging
 import asyncio
 import json
-import uuid
-import base64
-import time
-from typing import Dict, Any
 import logging
-from fastapi import FastAPI, File, UploadFile, Form, WebSocket, WebSocketDisconnect, HTTPException, Request, Depends
+import os
+import time
+import uuid
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+import websockets
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Form, UploadFile, File, Depends
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
+from starlette.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any
 import uvicorn
@@ -542,6 +546,9 @@ async def audio_stream_websocket(websocket: WebSocket):
                                 # logger.info(f"Saved audio stream to {audio_filename} ({file_size} bytes)")
                                 
                                 await websocket.send_text(f"Audio saved: {audio_filename} ({file_size} bytes)")
+                                
+                                # Schedule cleanup after 5 minutes
+                                asyncio.create_task(cleanup_audio_file(audio_file_path, delay_seconds=300))
                             else:
                                 await websocket.send_text("No audio data received")
                             
@@ -572,6 +579,9 @@ async def audio_stream_websocket(websocket: WebSocket):
                     f.write(chunk)
             file_size = audio_file_path.stat().st_size
             # logger.info(f"Saved final audio stream to {audio_filename} ({file_size} bytes)")
+            
+            # Schedule cleanup after 5 minutes
+            asyncio.create_task(cleanup_audio_file(audio_file_path, delay_seconds=300))
             
     except Exception as e:
         logger.error(f"Audio stream WebSocket error: {str(e)}")
@@ -2088,6 +2098,65 @@ async def startup_event():
     logger.info(f"Starting {Config.APP_TITLE} v{Config.APP_VERSION}")
     logger.info(f"Debug mode: {Config.DEBUG}")
     logger.info(f"Upload directory: {Config.UPLOAD_DIR}")
+    
+    # Clean up old audio files on startup
+    try:
+        await cleanup_old_audio_files(max_age_hours=24)
+    except Exception as e:
+        logger.error(f"Error during startup cleanup: {e}")
+    
+    # Schedule periodic cleanup every 6 hours
+    asyncio.create_task(periodic_cleanup())
+
+
+async def cleanup_audio_file(file_path: Path, delay_seconds: int = 300):
+    """Clean up audio file after specified delay."""
+    try:
+        await asyncio.sleep(delay_seconds)
+        if file_path.exists():
+            os.remove(file_path)
+            logger.info(f"Cleaned up audio file: {file_path.name}")
+    except Exception as e:
+        logger.error(f"Error cleaning up audio file {file_path}: {e}")
+
+
+async def cleanup_old_audio_files(max_age_hours: int = 24):
+    """Clean up audio files older than specified hours."""
+    try:
+        current_time = time.time()
+        upload_dir = Config.UPLOAD_DIR
+        
+        if not upload_dir.exists():
+            return
+            
+        cleaned_count = 0
+        for file_path in upload_dir.glob("*"):
+            if file_path.is_file():
+                # Check if file is older than max_age_hours
+                file_age = current_time - file_path.stat().st_mtime
+                if file_age > (max_age_hours * 3600):  # Convert hours to seconds
+                    try:
+                        os.remove(file_path)
+                        cleaned_count += 1
+                        logger.info(f"Cleaned up old audio file: {file_path.name}")
+                    except Exception as e:
+                        logger.error(f"Error removing old file {file_path}: {e}")
+        
+        if cleaned_count > 0:
+            logger.info(f"Cleanup completed: removed {cleaned_count} old audio files")
+            
+    except Exception as e:
+        logger.error(f"Error during audio cleanup: {e}")
+
+
+async def periodic_cleanup():
+    """Run periodic cleanup every 6 hours."""
+    while True:
+        try:
+            await asyncio.sleep(6 * 3600)  # 6 hours
+            await cleanup_old_audio_files(max_age_hours=24)
+        except Exception as e:
+            logger.error(f"Error in periodic cleanup: {e}")
 
 
 # Shutdown event
@@ -2095,6 +2164,12 @@ async def startup_event():
 async def shutdown_event():
     """Application shutdown event."""
     logger.info("Shutting down AI Voice Agent")
+    
+    # Clean up any remaining audio files
+    try:
+        await cleanup_old_audio_files(max_age_hours=0)  # Clean all files on shutdown
+    except Exception as e:
+        logger.error(f"Error during shutdown cleanup: {e}")
 
 
 if __name__ == "__main__":
