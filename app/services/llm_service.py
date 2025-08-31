@@ -355,7 +355,9 @@ Now provide a pirate-themed response incorporating this information. Keep it und
             skills = self.skill_manager.get_available_skills()
             if skills:
                 context_parts.append(f"You have special skills available: {', '.join(skills)}")
-                context_parts.append("Use these skills when users ask for current information, weather, news, or web searches.")
+                context_parts.append("IMPORTANT: When users ask for current information, weather, news, or web searches, you MUST use the available function calls.")
+                context_parts.append("For web searches, use the search_web function. For weather, use get_weather. For news, use get_news. For translation, use translate_text.")
+                context_parts.append("Do NOT say you cannot access real-time data - use the functions provided to get current information!")
         
         # Add chat history if available
         if chat_history:
