@@ -6,3 +6,6 @@ python-dotenv==1.0.0
 requests==2.31.0
 assemblyai>=0.18.0
 google-generativeai>=0.3.0
+websockets>=12.0
+httpx>=0.25.0
+google-cloud-translate>=3.12.0

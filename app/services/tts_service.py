@@ -1,11 +1,15 @@
 """
-Text-to-Speech service using Murf AI.
+Text-to-Speech service using Murf AI with WebSocket streaming support.
 """
-import requests
+import asyncio
+import base64
+import json
 import logging
+import requests
 import time
 import uuid
-from typing import Optional, Dict, Any
+import websockets
+from typing import Optional, Dict, Any, AsyncGenerator
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
@@ -23,6 +27,8 @@ class TTSService:
         self.api_url = "https://api.murf.ai/v1/speech/generate"
         self.voices_url = "https://api.murf.ai/v1/studio/voice-ai/voice-list"
         self.max_chars = 3000  # Murf API character limit
+        # Generate unique context_id for each session to avoid conflicts
+        self.base_context_id = "voice-agent-day22"
         
         logger.info("TTS Service initialized with Murf AI")
     
@@ -152,6 +158,231 @@ class TTSService:
                 status_code=500,
                 detail=f"Failed to fetch voices: {str(e)}"
             )
+    
+    def _split_text_into_chunks(self, text: str, max_chunk_size: int = 200) -> list[str]:
+        """Split text into smaller chunks to avoid WebSocket timeout."""
+        words = text.split()
+        chunks = []
+        current_chunk = []
+        current_length = 0
+        
+        for word in words:
+            if current_length + len(word) + 1 > max_chunk_size and current_chunk:
+                chunks.append(' '.join(current_chunk))
+                current_chunk = [word]
+                current_length = len(word)
+            else:
+                current_chunk.append(word)
+                current_length += len(word) + 1
+        
+        if current_chunk:
+            chunks.append(' '.join(current_chunk))
+        
+        return chunks
+    
+    async def stream_text_to_speech(
+        self,
+        text: str,
+        voice_id: str = "en-US-natalie",
+        sample_rate: int = 44100,
+        format: str = "WAV",
+        channel_type: str = "MONO"
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """Stream text-to-speech audio using Murf WebSocket API with connection retry."""
+        session_context_id = f"voice-agent-day22-{uuid.uuid4().hex[:8]}-{int(time.time() * 1000)}"
+        logger.info(f"Starting TTS streaming with context_id: {session_context_id}")
+        
+        ws_url = "wss://api.murf.ai/v1/speech/stream-input"
+        
+        try:
+            logger.info(f"Starting Murf WebSocket TTS streaming for text: {text[:50]}...")
+            
+            # Connect to Murf WebSocket with original working URL format
+            async with websockets.connect(
+                f"{ws_url}?api-key={self.api_key}&sample_rate={sample_rate}&channel_type={channel_type}&format={format}"
+            ) as websocket:
+                logger.info("Connected to Murf WebSocket")
+                
+                # Send voice configuration with unique context_id
+                voice_config = {
+                    "voice_config": {
+                        "voiceId": voice_id,
+                        "style": "Conversational",
+                        "rate": 0,
+                        "pitch": 0,
+                        "variation": 1,
+                        "context_id": session_context_id
+                    }
+                }
+                
+                logger.info(f"Sending voice config: {voice_config}")
+                await websocket.send(json.dumps(voice_config))
+                
+                # Send text message
+                text_msg = {
+                    "text": text,
+                    "context_id": session_context_id,
+                    "end": True  # Properly close context after sending text
+                }
+                
+                logger.info(f"Sending text message: {text_msg}")
+                await websocket.send(json.dumps(text_msg))
+                
+                # Process responses with enhanced error handling
+                chunk_count = 0
+                while True:
+                    try:
+                        response = await websocket.recv()
+                        if not response:
+                            logger.warning("Received empty response from Murf WebSocket")
+                            break
+                        data = json.loads(response)
+                    except websockets.exceptions.ConnectionClosed as e:
+                        logger.error(f"Murf WebSocket connection closed: {e}")
+                        break
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse JSON response: {e}")
+                        break
+                    except Exception as recv_error:
+                        logger.error(f"Error receiving WebSocket data: {recv_error}")
+                        break
+                    
+                    chunk_count += 1
+                    logger.info(f"Received chunk {chunk_count}: {data}")
+                    
+                    # Enhanced base64 audio logging for LinkedIn screenshot
+                    if "audio" in data:
+                        audio_b64 = data["audio"]
+                        print("\n" + "="*80)
+                        print(f"MURF WEBSOCKET BASE64 AUDIO CHUNK {chunk_count}")
+                        print("="*80)
+                        print(f"Audio length: {len(audio_b64)} characters")
+                        print(f"First 200 chars: {audio_b64[:200]}")
+                        print(f"Last 200 chars: {audio_b64[-200:]}")
+                        print("="*80)
+                        
+                        # Also log to logger for persistent record
+                        logger.info(f"Base64 audio chunk {chunk_count}: {len(audio_b64)} chars")
+                    
+                    yield data
+                    
+                    # Check if this is the final message
+                    if data.get("final"):
+                        logger.info("Murf WebSocket streaming completed")
+                        break
+                        
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"WebSocket TTS streaming error: {error_msg}")
+            
+            # Check for rate limiting
+            if "429" in error_msg or "Too Many Requests" in error_msg:
+                raise HTTPException(
+                    status_code=429,
+                    detail="TTS service rate limited. Please wait a few minutes before trying again."
+                )
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"WebSocket TTS streaming error: {error_msg}"
+                )
+    
+    async def _stream_single_chunk(self, text: str, session_context_id: str) -> AsyncGenerator[Dict[str, Any], None]:
+        """Stream a single text chunk to avoid WebSocket timeouts."""
+        ws_url = "wss://api.murf.ai/v1/speech/stream-input"
+        
+        try:
+            logger.info(f"Starting Murf WebSocket TTS streaming for chunk: {text[:50]}...")
+            
+            # Connect to Murf WebSocket with original working URL format
+            async with websockets.connect(
+                f"{ws_url}?api-key={self.api_key}&sample_rate=44100&channel_type=MONO&format=WAV"
+            ) as websocket:
+                logger.info("Connected to Murf WebSocket")
+                
+                # Send voice configuration with unique context_id
+                voice_config = {
+                    "voice_config": {
+                        "voiceId": "en-US-natalie",
+                        "style": "Conversational",
+                        "rate": 0,
+                        "pitch": 0,
+                        "variation": 1,
+                        "context_id": session_context_id
+                    }
+                }
+                
+                logger.info(f"Sending voice config: {voice_config}")
+                await websocket.send(json.dumps(voice_config))
+                
+                # Send text message with same context_id and end=True to properly close
+                text_msg = {
+                    "text": text,
+                    "context_id": session_context_id,
+                    "end": True  # Properly close context after sending text
+                }
+                
+                logger.info(f"Sending text message: {text_msg}")
+                await websocket.send(json.dumps(text_msg))
+                
+                # Process responses
+                chunk_count = 0
+                while True:
+                    try:
+                        response = await websocket.recv()
+                        if not response:
+                            logger.warning("Received empty response from Murf WebSocket")
+                            break
+                        data = json.loads(response)
+                    except websockets.exceptions.ConnectionClosed as e:
+                        logger.error(f"Murf WebSocket connection closed: {e}")
+                        break
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse JSON response: {e}")
+                        break
+                    except Exception as recv_error:
+                        logger.error(f"Error receiving WebSocket data: {recv_error}")
+                        break
+                    
+                    chunk_count += 1
+                    logger.info(f"Received chunk {chunk_count}: {data}")
+                    
+                    # Enhanced base64 audio logging for LinkedIn screenshot
+                    if "audio" in data:
+                        audio_b64 = data["audio"]
+                        print("\n" + "="*80)
+                        print(f"MURF WEBSOCKET BASE64 AUDIO CHUNK {chunk_count}")
+                        print("="*80)
+                        print(f"Audio length: {len(audio_b64)} characters")
+                        print(f"First 200 chars: {audio_b64[:200]}")
+                        print(f"Last 50 chars: ...{audio_b64[-50:]}")
+                        print("="*80 + "\n")
+                        
+                        # Also log to logger for persistent record
+                        logger.info(f"Base64 audio chunk {chunk_count}: {len(audio_b64)} chars")
+                    
+                    yield data
+                    
+                    # Check if this is the final message
+                    if data.get("final"):
+                        logger.info("Murf WebSocket streaming completed")
+                        break
+                        
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"WebSocket TTS streaming error: {error_msg}")
+            
+            # Check for rate limiting
+            if "429" in error_msg or "Too Many Requests" in error_msg:
+                raise HTTPException(
+                    status_code=429,
+                    detail="TTS service rate limited. Please wait a few minutes before trying again."
+                )
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"WebSocket TTS streaming error: {error_msg}"
+                )
     
     def health_check(self) -> bool:
         """Check if the TTS service is healthy."""
