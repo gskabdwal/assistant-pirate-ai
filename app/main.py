@@ -805,13 +805,13 @@ async def llm_to_murf_websocket(websocket: WebSocket):
     except Exception as e:
         logger.error(f"LLM to Murf WebSocket error: {str(e)}")
         try:
-            await websocket.send_text(json.dumps({
+            await websocket.send_json({
                 "type": "error",
-                "message": str(e)
-            }))
-        except:
+                "message": "WebSocket error occurred"
+            })
+            await websocket.close(code=1011, reason="Error")
+        except Exception:
             pass
-        await websocket.close(code=1011, reason=str(e))
 
 
 @app.websocket("/ws/audio-stream-base64")
@@ -856,7 +856,15 @@ async def audio_stream_base64_websocket(websocket: WebSocket):
         
     except Exception as e:
         error_msg = f"Service initialization failed for session {session_id}: {str(e)}"
-        await websocket.close(code=1011, reason=error_msg)
+        logger.error(f"Base64 audio stream: {error_msg}")
+        try:
+            await websocket.send_json({
+                "type": "error", 
+                "message": "API keys not configured"
+            })
+            await websocket.close(code=1011, reason="Config error")
+        except Exception:
+            pass
         return
     
     try:
@@ -1281,7 +1289,16 @@ async def complete_voice_agent_websocket(websocket: WebSocket):
     except Exception as e:
         error_msg = f"Service initialization failed for session {session_id}: {str(e)}"
         logger.error(f"Day 23: {error_msg}")
-        await websocket.close(code=1011, reason=error_msg)
+        # Send error message via WebSocket before closing (avoid long close reason)
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "message": "API keys not configured. Please configure API keys in the settings.",
+                "details": str(e)
+            })
+            await websocket.close(code=1011, reason="API keys missing")
+        except Exception as close_error:
+            logger.error(f"Day 23: Error closing WebSocket: {close_error}")
         return
     
     # AssemblyAI streaming client - will be created per session
