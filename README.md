@@ -1,4 +1,4 @@
-# 30 Days of Voice Agents
+# 30 Days of Voice Agents (https://assistant.pirateai.app)
 
 ## Overview
 
